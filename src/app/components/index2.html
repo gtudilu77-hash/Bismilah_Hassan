@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>A.V.E.S</title>
+
+<style>
+
+body{
+margin:0;
+font-family:'Segoe UI',sans-serif;
+background:#0b1e3c;
+color:white;
+overflow:hidden;
+}
+
+.slide{
+display:none;
+height:100vh;
+padding:60px;
+animation:fade 0.7s;
+}
+
+.active{display:block;}
+
+h1{
+font-size:40px;
+margin-bottom:20px;
+}
+
+.topbar{
+background:#0f2a57;
+padding:10px 20px;
+font-size:14px;
+opacity:0.8;
+}
+
+.box{
+background:#12386b;
+padding:20px;
+border-radius:10px;
+margin:10px;
+flex:1;
+}
+
+.row{
+display:flex;
+gap:15px;
+margin-top:15px;
+}
+
+.small{
+font-size:13px;
+opacity:0.7;
+margin-top:10px;
+}
+
+.controls{
+position:fixed;
+bottom:20px;
+right:20px;
+}
+
+button{
+padding:10px 20px;
+border:none;
+background:#1e90ff;
+color:white;
+border-radius:8px;
+cursor:pointer;
+}
+
+.voice{
+position:fixed;
+left:20px;
+bottom:20px;
+background:#111;
+border:1px solid #555;
+}
+
+@keyframes fade{
+from{opacity:0;transform:translateY(20px);}
+to{opacity:1;}
+}
+
+.progress{
+position:fixed;
+top:0;
+left:0;
+height:4px;
+background:#1e90ff;
+width:0%;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="progress" id="progress"></div>
+
+<!-- CAPA -->
+<div class="slide active">
+
+<div class="topbar">PROJECTO TECNOLÓGICO</div>
+
+<h1>A.V.E.S</h1>
+<h3>Assistente Virtual de Explicações e Suporte</h3>
+
+<div class="box">
+Tudilu Manuel<br>
+Elijah Gomes<br>
+Kialme de Almeida
+
+<div class="small">
+Orientador: João Alexandre André<br>
+Colégio Pitruca • Luanda 2025-2026<br>
+Ensino Médio Técnico de Informática
+</div>
+</div>
+
+</div>
+
+<!-- ÍNDICE -->
+<div class="slide">
+
+<h1>ÍNDICE</h1>
+
+<div class="row">
+<div class="box">01 Introdução</div>
+<div class="box">02 Objetivos</div>
+</div>
+
+<div class="row">
+<div class="box">03 Fundamentação</div>
+<div class="box">04 Metodologia</div>
+</div>
+
+<div class="row">
+<div class="box">05 Arquitetura</div>
+<div class="box">06 Funcionalidades</div>
+</div>
+
+<div class="row">
+<div class="box">07 Interface</div>
+<div class="box">08 Conclusão</div>
+</div>
+
+</div>
+
+<!-- OBJETIVOS -->
+<div class="slide">
+
+<h1>OBJETIVOS DO PROJECTO</h1>
+
+<div class="box">
+<strong>Objetivo Geral:</strong><br>
+Desenvolver um assistente virtual inteligente para apoio educacional.
+</div>
+
+<div class="row">
+<div class="box">Interação por texto e voz</div>
+<div class="box">Resposta automática inteligente</div>
+</div>
+
+<div class="row">
+<div class="box">Auxílio ao estudante</div>
+<div class="box">Automatização de tarefas</div>
+</div>
+
+</div>
+
+<!-- FUNDAMENTAÇÃO -->
+<div class="slide">
+
+<h1>FUNDAMENTAÇÃO TEÓRICA</h1>
+
+<div class="row">
+<div class="box">Inteligência Artificial</div>
+<div class="box">Processamento de Linguagem</div>
+</div>
+
+<div class="row">
+<div class="box">Machine Learning</div>
+<div class="box">Assistentes Virtuais</div>
+</div>
+
+</div>
+
+<!-- METODOLOGIA -->
+<div class="slide">
+
+<h1>METODOLOGIA</h1>
+
+<div class="row">
+<div class="box">Pesquisa aplicada</div>
+<div class="box">Desenvolvimento em React</div>
+</div>
+
+<div class="row">
+<div class="box">Integração com OpenAI</div>
+<div class="box">Testes e validação</div>
+</div>
+
+</div>
+
+<!-- ARQUITETURA -->
+<div class="slide">
+
+<h1>ARQUITETURA DO SISTEMA</h1>
+
+<div class="row">
+<div class="box">Frontend (UI)</div>
+<div class="box">Backend (Node.js)</div>
+</div>
+
+<div class="row">
+<div class="box">API OpenAI</div>
+<div class="box">Base de Dados</div>
+</div>
+
+</div>
+
+<!-- FUNCIONALIDADES -->
+<div class="slide">
+
+<h1>FUNCIONALIDADES</h1>
+
+<div class="row">
+<div class="box">Chat Inteligente</div>
+<div class="box">Reconhecimento de Voz</div>
+</div>
+
+<div class="row">
+<div class="box">Resposta por Áudio</div>
+<div class="box">Interação em Tempo Real</div>
+</div>
+
+</div>
+
+<!-- INTERFACE -->
+<div class="slide">
+
+<h1>INTERFACE DO SISTEMA</h1>
+
+<div class="box">
+Interface moderna com design intuitivo,
+chat interativo e experiência fluida.
+</div>
+
+</div>
+
+<!-- CONCLUSÃO -->
+<div class="slide">
+
+<h1>CONCLUSÃO</h1>
+
+<div class="box">
+O A.V.E.S demonstra como a inteligência artificial
+pode revolucionar o suporte educacional,
+tornando o aprendizado mais acessível e eficiente.
+</div>
+
+</div>
+
+<!-- BOTÕES -->
+<div class="controls">
+<button onclick="prev()">◀️</button>
+<button onclick="next()">▶️</button>
+</div>
+
+<button class="voice" onclick="speak()">🔊</button>
+
+<script>
+
+let slides=document.querySelectorAll(".slide")
+let progress=document.getElementById("progress")
+let current=0
+
+function show(i){
+slides.forEach(s=>s.classList.remove("active"))
+slides[i].classList.add("active")
+progress.style.width=((i+1)/slides.length)*100+"%"
+}
+
+function next(){
+current++
+if(current>=slides.length) current=0
+show(current)
+}
+
+function prev(){
+current--
+if(current<0) current=slides.length-1
+show(current)
+}
+
+// voz manual
+function speak(){
+let text=slides[current].innerText
+let speech=new SpeechSynthesisUtterance(text)
+speech.lang="pt-PT"
+speech.rate=0.9
+window.speechSynthesis.cancel()
+window.speechSynthesis.speak(speech)
+}
+
+</script>
+
+</body>
+</html>
