@@ -32,29 +32,31 @@ export function Login({ onLogin }: LoginProps) {
   const [openForgot, setOpenForgot] = useState(false);
   const [openSignUp, setOpenSignUp] = useState(false);
 
-  // ✅ Captura o resultado do redirect do Google/GitHub
   useEffect(() => {
     getRedirectResult(auth).then(async (result) => {
-      if (!result?.user) return;
+      console.log("REDIRECT RESULT:", result);
+      if (!result?.user) {
+        console.log("Sem utilizador no redirect");
+        return;
+      }
       const user = result.user;
+      console.log("Utilizador:", user.email);
 
       const userRef = doc(db, "users", user.uid);
       const userSnap = await getDoc(userRef);
 
       if (!userSnap.exists()) {
-        // @ts-ignore
-        const githubUsername = user.reloadUserInfo?.screenName;
         await setDoc(userRef, {
           uid: user.uid,
-          email: user.email || `${githubUsername}@github.com`,
-          name: user.displayName || githubUsername || user.email?.split("@")[0],
+          email: user.email,
+          name: user.displayName || user.email?.split("@")[0],
           photo: user.photoURL || "",
           createdAt: new Date()
         });
       }
       onLogin();
     }).catch((error) => {
-      console.error("Redirect error:", error);
+      console.error("REDIRECT ERRO:", error);
     });
   }, []);
 
@@ -86,7 +88,6 @@ export function Login({ onLogin }: LoginProps) {
     setIsLoading(false);
   };
 
-  // ✅ Google com redirect
   const handleGoogleLogin = async () => {
     try {
       const provider = new GoogleAuthProvider();
@@ -96,7 +97,6 @@ export function Login({ onLogin }: LoginProps) {
     }
   };
 
-  // ✅ GitHub com redirect
   const handleGithubLogin = async () => {
     try {
       const provider = new GithubAuthProvider();
@@ -109,7 +109,6 @@ export function Login({ onLogin }: LoginProps) {
   return (
     <div className="min-h-screen bg-[#050208] text-white relative flex items-center justify-center px-4 overflow-hidden font-sans">
       
-      {/* 🌌 BACKGROUND IDENTICO AO DASHBOARD */}
       <div className="fixed inset-0 z-0">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,#1a0b2e_0%,#050208_100%)]" />
         <div className="absolute inset-0 opacity-20 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:40px_40px]" />
@@ -120,7 +119,6 @@ export function Login({ onLogin }: LoginProps) {
       <div className="relative z-10 w-full max-w-6xl py-12">
         <div className="grid lg:grid-cols-2 gap-16 items-center">
 
-          {/* 🐔 ESQUERDA: MASCOTE & TEXTO HERO */}
           <div className="hidden lg:flex flex-col justify-center items-center text-center space-y-8">
             <div className="relative transform hover:scale-105 transition-transform duration-700">
                 <div className="absolute inset-0 bg-purple-500/20 blur-[80px] rounded-full" />
@@ -140,7 +138,6 @@ export function Login({ onLogin }: LoginProps) {
             </div>
           </div>
 
-          {/* 🔒 DIREITA: CARD DE LOGIN */}
           <div className="w-full max-w-md mx-auto lg:mx-0">
             <div className="relative group">
               <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 to-fuchsia-600 rounded-[2rem] blur opacity-20 group-hover:opacity-40 transition duration-1000 group-hover:duration-200" />
