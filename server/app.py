@@ -7,16 +7,24 @@ import io, os, base64, time, threading
 from collections import Counter
 import firebase_admin
 from firebase_admin import credentials, firestore
+from dotenv import load_dotenv
 
 # ==========================================
-# 🚀 ARRANQUE
+# 🚀 ARRANQUE E CONFIGURAÇÃO DE AMBIENTE
 # ==========================================
 app = Flask(__name__)
 CORS(app)
 
 print("🔥 A.V.E.S_OS — MODO DEFESA ATIVO...")
-import os
+
+# Carrega as variáveis do ficheiro .env local se ele existir
+load_dotenv()
+
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+# Instanciação correta do cliente OpenAI usando a chave de ambiente
+client = OpenAI(api_key=OPENAI_API_KEY)
+
 # ── Firebase ──────────────────────────────────────────────────────────────────
 db = None
 if os.path.exists("firebase-credentials.json"):
@@ -336,7 +344,7 @@ COMO FALAS:
 SITUAÇÃO ESPECIAL — DEFESA:
 Se os metadados indicarem "Banca / Audiência", começas EXACTAMENTE com:
 "Mano Tudilu, chegou o dia. Toda a gente está aí?"
-E depois dás uma palavra de força curta e genuína, como um amigo que acredita mesmo nele.
+E depois dás uma palavra de força corta e genuína, como um amigo que acredita mesmo nele.
 
 EXEMPLOS DE COMO RESPONDES:
 - Ao ver o Tudilu: "Ei mano, tás por aqui! Tudo bem contigo?"
@@ -570,4 +578,6 @@ def reset_chat():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001, debug=False, threaded=True)
+    # O Render injeta a variável PORT dinamicamente, se não encontrar usa a 5001 localmente
+    port = int(os.environ.get("PORT", 5001))
+    app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
