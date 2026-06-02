@@ -1,12 +1,18 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChickenMascot } from './ChickenMascot';
-import { Sparkles, Lock, Mail, Eye, EyeOff, Chrome, Github, ChevronRight, ArrowRight } from 'lucide-react';
+import { Sparkles, Lock, Mail, Eye, EyeOff, Chrome, Github, ArrowRight } from 'lucide-react';
 import { ForgotPasswordModal } from './ForgotPasswordModal';
 import { SignUpModal } from './SignUpModal';
 
 // 🔥 FIREBASE
 import { auth } from '../../firebase';
-import { signInWithEmailAndPassword, GoogleAuthProvider, GithubAuthProvider, signInWithPopup } from 'firebase/auth';
+import { 
+  signInWithEmailAndPassword, 
+  GoogleAuthProvider, 
+  GithubAuthProvider, 
+  signInWithRedirect,
+  getRedirectResult
+} from 'firebase/auth';
 
 // 🔥 FIRESTORE
 import { db } from '../../firebase';
@@ -25,6 +31,32 @@ export function Login({ onLogin }: LoginProps) {
   // MODALS
   const [openForgot, setOpenForgot] = useState(false);
   const [openSignUp, setOpenSignUp] = useState(false);
+
+  // ✅ Captura o resultado do redirect do Google/GitHub
+  useEffect(() => {
+    getRedirectResult(auth).then(async (result) => {
+      if (!result?.user) return;
+      const user = result.user;
+
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
+
+      if (!userSnap.exists()) {
+        // @ts-ignore
+        const githubUsername = user.reloadUserInfo?.screenName;
+        await setDoc(userRef, {
+          uid: user.uid,
+          email: user.email || `${githubUsername}@github.com`,
+          name: user.displayName || githubUsername || user.email?.split("@")[0],
+          photo: user.photoURL || "",
+          createdAt: new Date()
+        });
+      }
+      onLogin();
+    }).catch((error) => {
+      console.error("Redirect error:", error);
+    });
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,52 +86,21 @@ export function Login({ onLogin }: LoginProps) {
     setIsLoading(false);
   };
 
+  // ✅ Google com redirect
   const handleGoogleLogin = async () => {
     try {
       const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-
-      const userRef = doc(db, "users", user.uid);
-      const userSnap = await getDoc(userRef);
-
-      if (!userSnap.exists()) {
-        await setDoc(userRef, {
-          uid: user.uid,
-          email: user.email,
-          name: user.displayName,
-          photo: user.photoURL,
-          createdAt: new Date()
-        });
-      }
-      onLogin();
+      await signInWithRedirect(auth, provider);
     } catch (error: any) {
       alert(error.message);
     }
   };
 
+  // ✅ GitHub com redirect
   const handleGithubLogin = async () => {
     try {
       const provider = new GithubAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-
-      const userRef = doc(db, "users", user.uid);
-      const userSnap = await getDoc(userRef);
-
-      if (!userSnap.exists()) {
-        // @ts-ignore - reloadUserInfo pode não estar tipado estritamente, mas contém o username do github
-        const githubUsername = user.reloadUserInfo?.screenName;
-
-        await setDoc(userRef, {
-          uid: user.uid,
-          email: user.email || `${githubUsername}@github.com`, // Fallback caso o e-mail do GitHub seja privado
-          name: user.displayName || githubUsername || "Usuário GitHub",
-          photo: user.photoURL,
-          createdAt: new Date()
-        });
-      }
-      onLogin();
+      await signInWithRedirect(auth, provider);
     } catch (error: any) {
       alert(error.message);
     }
@@ -142,12 +143,10 @@ export function Login({ onLogin }: LoginProps) {
           {/* 🔒 DIREITA: CARD DE LOGIN */}
           <div className="w-full max-w-md mx-auto lg:mx-0">
             <div className="relative group">
-              {/* Glow externo animado */}
               <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 to-fuchsia-600 rounded-[2rem] blur opacity-20 group-hover:opacity-40 transition duration-1000 group-hover:duration-200" />
               
               <div className="relative bg-[#0d0616]/80 backdrop-blur-3xl rounded-[2rem] p-8 sm:p-12 border border-white/10 shadow-2xl">
                 
-                {/* HEADER MOBILE & TITULO */}
                 <div className="mb-10">
                    <div className="flex items-center gap-3 mb-6 lg:hidden">
                       <div className="w-10 h-10 rounded-xl bg-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/50">
@@ -159,7 +158,6 @@ export function Login({ onLogin }: LoginProps) {
                    <p className="text-white/40 text-sm">Acesse seu painel de controle IA</p>
                 </div>
 
-                {/* FORMULÁRIO */}
                 <form onSubmit={handleSubmit} className="space-y-5">
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-purple-300 uppercase tracking-widest ml-1">E-mail</label>
@@ -220,13 +218,11 @@ export function Login({ onLogin }: LoginProps) {
                   </button>
                 </form>
 
-                {/* DIVIDER */}
                 <div className="relative my-8 text-center">
                   <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/5"></div></div>
                   <span className="relative px-4 bg-[#0d0616] text-[10px] font-bold uppercase tracking-[0.2em] text-white/20">Ou continuar com</span>
                 </div>
 
-                {/* SOCIAL BUTTONS */}
                 <div className="grid grid-cols-2 gap-4">
                   <button
                     onClick={handleGoogleLogin}
@@ -245,7 +241,6 @@ export function Login({ onLogin }: LoginProps) {
                   </button>
                 </div>
 
-                {/* FOOTER DO CARD */}
                 <div className="mt-10 text-center">
                    <p className="text-sm text-white/40">
                     Ainda não tem acesso?{" "}
@@ -262,7 +257,6 @@ export function Login({ onLogin }: LoginProps) {
               </div>
             </div>
 
-            {/* STATUS SYSTEM */}
             <div className="mt-8 flex items-center justify-center gap-3 text-[10px] font-bold uppercase tracking-widest text-purple-400/40">
               <span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
               Sistemas Operacionais — Luanda, AO
@@ -272,7 +266,6 @@ export function Login({ onLogin }: LoginProps) {
         </div>
       </div>
 
-      {/* MODALS */}
       <ForgotPasswordModal
         isOpen={openForgot}
         onClose={() => setOpenForgot(false)}

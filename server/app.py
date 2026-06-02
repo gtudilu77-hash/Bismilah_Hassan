@@ -27,8 +27,10 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 
 # ── Firebase ──────────────────────────────────────────────────────────────────
 db = None
-if os.path.exists("firebase-credentials.json"):
-    cred = credentials.Certificate("firebase-credentials.json")
+import json
+firebase_json = os.getenv("FIREBASE_CREDENTIALS")
+if firebase_json:
+    cred = credentials.Certificate(json.loads(firebase_json))
     firebase_admin.initialize_app(cred)
     db = firestore.client()
     print("☁️  [FIREBASE] Ligado!")
