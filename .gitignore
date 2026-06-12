@@ -1,0 +1,39 @@
+# Python envs
+venv/
+vision_env/
+
+# Node modules
+node_modules/
+backend/node_modules/
+
+# Environment variables
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# ML models
+*.pt
+
+# Firebase / secrets (caso exista no projeto)
+server/firebase-credentials.jsonvision_env/
+node_modules/
+.env
+*.pt
+venv/
+vision_env/
+node_modules/
+backend/node_modules/
+
+.env
+__pycache__/
+
+*.pyc
+*.pyo
+
+*.dylib
+*.so
+*.node
+server/firebase-credentials.json
