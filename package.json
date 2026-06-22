@@ -4,11 +4,21 @@
   "private": true,
   "version": "0.0.1",
   "type": "module",
+
+  "description": "This is a code bundle for Design AI Mascot Character. The original project is available at https://www.figma.com/design/EM5shQUxXYfHdNGMwkBbvN/Design-AI-Mascot-Character.",
+  "main": "index.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+
   "scripts": {
-    "build": "vite build",
+    "start": "node server.js",
     "dev": "vite",
-    "start": "node server.js"
+    "build": "vite build",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist"
   },
+
   "dependencies": {
     "@azure/cognitiveservices-face": "^5.0.0",
     "@azure/ms-rest-js": "^2.7.0",
@@ -79,19 +89,23 @@
     "tw-animate-css": "1.3.8",
     "vaul": "1.1.2"
   },
+
   "devDependencies": {
     "@tailwindcss/vite": "4.1.12",
     "@types/node": "^25.2.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "4.7.0",
+    "gh-pages": "^6.3.0",
     "tailwindcss": "4.1.12",
     "vite": "6.3.5"
   },
+
   "peerDependencies": {
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
+
   "peerDependenciesMeta": {
     "react": {
       "optional": true
@@ -100,14 +114,10 @@
       "optional": true
     }
   },
+
   "pnpm": {
     "overrides": {
       "vite": "6.3.5"
     }
-  },
-  "description": "This is a code bundle for Design AI Mascot Character. The original project is available at https://www.figma.com/design/EM5shQUxXYfHdNGMwkBbvN/Design-AI-Mascot-Character.",
-  "main": "index.js",
-  "keywords": [],
-  "author": "",
-  "license": "ISC"
+  }
 }

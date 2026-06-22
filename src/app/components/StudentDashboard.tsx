@@ -89,7 +89,7 @@ function StatCard({ icon: Icon, label, value, sub, color }: { icon: any; label: 
         </div>
         <ArrowUp className="w-3 h-3 text-green-400 opacity-60" />
       </div>
-      <div className="text-2xl sm:text-3xl font-black mb-0.5" style={{ color }}>{value}</div>
+      <div className="text-xl sm:text-2xl lg:text-3xl font-black mb-0.5 truncate" style={{ color }}>{value}</div>
       <div className="text-[11px] font-bold text-white/50 uppercase tracking-wider">{label}</div>
       <div className="text-[10px] text-white/30 mt-1">{sub}</div>
     </div>
@@ -194,21 +194,21 @@ export default function StudentDashboard() {
       {/* ── NAVBAR ── */}
       <nav className={`fixed top-0 w-full z-[100] transition-all duration-500 ${scrolled ? 'py-2' : 'py-5'}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className={`flex items-center justify-between px-4 sm:px-6 py-3 rounded-2xl border transition-all duration-500 ${scrolled ? 'bg-black/50 border-white/10 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)]' : 'bg-white/[0.02] border-white/[0.05] backdrop-blur-md'}`}>
-            <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
-              <img src={avesLogo} className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl border border-white/20" alt="Logo" />
-              <span className="text-lg sm:text-2xl font-black tracking-tighter bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
-                A.V.E.S <span className="text-white/30 text-sm font-medium">ALUNO</span>
+          <div className={`flex items-center justify-between gap-2 px-3 sm:px-6 py-3 rounded-2xl border transition-all duration-500 ${scrolled ? 'bg-black/50 border-white/10 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.5)]' : 'bg-white/[0.02] border-white/[0.05] backdrop-blur-md'}`}>
+            <div className="flex items-center gap-2 sm:gap-3 cursor-pointer min-w-0" onClick={() => navigate('/')}>
+              <img src={avesLogo} className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl border border-white/20 shrink-0" alt="Logo" />
+              <span className="text-base sm:text-2xl font-black tracking-tighter bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent whitespace-nowrap">
+                A.V.E.S <span className="hidden sm:inline text-white/30 text-sm font-medium">ALUNO</span>
               </span>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
               {user && (
-                <div className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-white/60 backdrop-blur-md">
-                  <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
-                  {user.email?.split('@')[0]}
+                <div className="hidden md:flex items-center gap-2 px-3 py-2 rounded-xl bg-white/[0.04] border border-white/10 text-xs text-white/60 backdrop-blur-md max-w-[140px]">
+                  <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse shrink-0" />
+                  <span className="truncate">{user.email?.split('@')[0]}</span>
                 </div>
               )}
-              <button onClick={handleLogout} className="p-2 sm:p-2.5 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-red-500/20 transition-all">
+              <button onClick={handleLogout} className="p-2 sm:p-2.5 rounded-xl bg-white/[0.04] border border-white/10 hover:bg-red-500/20 transition-all shrink-0">
                 <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
             </div>
@@ -223,37 +223,37 @@ export default function StudentDashboard() {
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs font-bold tracking-widest uppercase">
               <Sparkles className="w-3 h-3" /> Nova Era do Estudo
             </div>
-            <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black leading-[0.9] tracking-tight">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-black leading-[0.95] sm:leading-[0.9] tracking-tight">
               Aprenda com <br />
               <span className="bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">Clareza.</span>
             </h1>
             <p className="text-base sm:text-lg text-white/60 leading-relaxed max-w-xl mx-auto lg:mx-0">
               Materiais dos teus professores, IA para estudar e acompanhamento real do teu progresso.
             </p>
-            <div className="flex flex-wrap gap-4 justify-center lg:justify-start">
-              <button onClick={() => navigate("/chat", { state: { role: "aluno" } })} className="group relative px-6 sm:px-8 py-3.5 sm:py-4 bg-[#8b5cf6] rounded-2xl overflow-hidden transition-all hover:scale-105 shadow-[0_0_30px_rgba(139,92,246,0.4)] font-bold flex items-center gap-3">
+            <div className="flex flex-col sm:flex-row flex-wrap gap-4 justify-center lg:justify-start">
+              <button onClick={() => navigate("/chat", { state: { role: "aluno" } })} className="group relative w-full sm:w-auto px-6 sm:px-8 py-3.5 sm:py-4 bg-[#8b5cf6] rounded-2xl overflow-hidden transition-all hover:scale-105 shadow-[0_0_30px_rgba(139,92,246,0.4)] font-bold flex items-center justify-center gap-3">
                 <div className="absolute inset-0 bg-gradient-to-r from-[#a78bfa] to-[#d946ef] opacity-0 group-hover:opacity-100 transition-opacity" />
                 <div className="relative flex items-center gap-3"><MessageSquare className="w-5 h-5" /> Testar IA</div>
               </button>
-              <button onClick={() => navigate("/vision")} className="px-6 sm:px-8 py-3.5 sm:py-4 bg-cyan-600/10 border border-cyan-500/20 rounded-2xl transition-all hover:scale-105 font-bold text-cyan-400 flex items-center gap-3 hover:bg-cyan-600/30 backdrop-blur-md">
+              <button onClick={() => navigate("/vision")} className="w-full sm:w-auto px-6 sm:px-8 py-3.5 sm:py-4 bg-cyan-600/10 border border-cyan-500/20 rounded-2xl transition-all hover:scale-105 font-bold text-cyan-400 flex items-center justify-center gap-3 hover:bg-cyan-600/30 backdrop-blur-md">
                 <Eye className="w-5 h-5" /> Visão IA
               </button>
             </div>
           </div>
-          <div className="relative flex justify-center mt-4 lg:mt-0">
+          <div className="relative flex justify-center mt-4 lg:mt-0 w-full max-w-[280px] sm:max-w-[380px] lg:max-w-none mx-auto">
             <AnimatedChickenMascot size="large" />
-            <div className="absolute w-[350px] sm:w-[450px] h-[350px] sm:h-[450px] rounded-full bg-[#bf5af2]/15 blur-[100px] -z-10 animate-pulse" />
+            <div className="absolute w-[260px] sm:w-[350px] md:w-[450px] h-[260px] sm:h-[350px] md:h-[450px] rounded-full bg-[#bf5af2]/15 blur-[100px] -z-10 animate-pulse" />
           </div>
         </div>
       </section>
 
       {/* ── TABS ── */}
-      <div className="relative z-10 px-4 sm:px-6 mb-8">
+      <div className="relative z-10 px-4 sm:px-6 mb-8 overflow-x-auto">
         <div className="max-w-7xl mx-auto">
           <div className="inline-flex bg-white/[0.03] border border-white/[0.08] rounded-2xl p-1">
             {(['materias', 'stats'] as const).map(tab => (
               <button key={tab} onClick={() => setActiveTab(tab)}
-                className={`px-5 sm:px-8 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === tab ? 'bg-blue-600 text-white shadow-[0_4px_12px_rgba(37,99,235,0.4)]' : 'text-white/40 hover:text-white/70'}`}>
+                className={`px-4 sm:px-8 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === tab ? 'bg-blue-600 text-white shadow-[0_4px_12px_rgba(37,99,235,0.4)]' : 'text-white/40 hover:text-white/70'}`}>
                 {tab === 'materias' ? '📚 Materiais' : '📊 Progresso'}
               </button>
             ))}
@@ -274,7 +274,7 @@ export default function StudentDashboard() {
                 Nenhuma matéria foi enviada ainda.
               </div>
             ) : (
-              <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-5 sm:gap-8">
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5 sm:gap-8">
                 {materias.map(m => (
                   <div key={m.id} className="group relative bg-white/[0.02] border border-white/[0.08] hover:border-blue-500/40 rounded-3xl p-5 sm:p-7 transition-all duration-300 hover:scale-[1.02] backdrop-blur-xl shadow-[0_8px_32px_0_rgba(0,0,0,0.2)] hover:shadow-[0_0_30px_rgba(59,130,246,0.15)]">
                     <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent rounded-t-3xl" />
@@ -314,7 +314,7 @@ export default function StudentDashboard() {
             </div>
 
             {/* Stat cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
               <StatCard icon={Target}     label="Média Geral"    value={`${stats.avgScore}%`}        sub="Todos os quizzes"           color="#3b82f6" />
               <StatCard icon={Trophy}     label="Melhor Tópico"  value={stats.bestTopic === '—' ? '—' : '🏆'} sub={stats.bestTopic}    color="#f59e0b" />
               <StatCard icon={Brain}      label="Quizzes Feitos" value={String(stats.totalQuizzes)}  sub="Total acumulado"            color="#8b5cf6" />
@@ -391,9 +391,9 @@ export default function StudentDashboard() {
                   ) : (
                     <div className="space-y-2">
                       {stats.weakTopics.map((t, i) => (
-                        <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-orange-500/5 border border-orange-500/15">
-                          <span className="text-sm text-white/70">{t}</span>
-                          <button onClick={() => navigate("/chat", { state: { role: "aluno", prompt: `Explica-me melhor o tópico: ${t}` } })} className="text-[10px] font-black text-orange-400 bg-orange-500/10 px-3 py-1.5 rounded-lg hover:bg-orange-500/20 transition-all">
+                        <div key={i} className="flex items-center justify-between gap-2 flex-wrap p-3 rounded-xl bg-orange-500/5 border border-orange-500/15">
+                          <span className="text-sm text-white/70 min-w-0 break-words">{t}</span>
+                          <button onClick={() => navigate("/chat", { state: { role: "aluno", prompt: `Explica-me melhor o tópico: ${t}` } })} className="text-[10px] font-black text-orange-400 bg-orange-500/10 px-3 py-1.5 rounded-lg hover:bg-orange-500/20 transition-all shrink-0">
                             Estudar →
                           </button>
                         </div>

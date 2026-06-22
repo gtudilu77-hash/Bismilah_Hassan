@@ -110,16 +110,16 @@ function TeacherModal({isOpen,onClose}:{isOpen:boolean;onClose:()=>void}) {
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-md p-4">
       <div className="w-full max-w-2xl rounded-3xl text-white max-h-[90vh] flex flex-col" style={{background:'#080f0c',border:`1px solid ${T.border}`,boxShadow:`0 0 80px ${T.glow}`}}>
-        <div className="p-4 sm:p-5 flex justify-between items-center border-b border-white/[0.08] shrink-0">
-          <div className="flex gap-1">
+        <div className="p-4 sm:p-5 flex justify-between items-center gap-2 border-b border-white/[0.08] shrink-0">
+          <div className="flex gap-1 overflow-x-auto">
             {(['upload','questions'] as const).map(t=>(
-              <button key={t} onClick={()=>setTab(t)} className="px-4 py-2 rounded-xl text-sm font-bold transition-all"
+              <button key={t} onClick={()=>setTab(t)} className="px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap"
                 style={tab===t?{background:T.accent,color:'#000'}:{color:'rgba(255,255,255,0.4)'}}>
-                {t==='upload'?'📤 Enviar Matéria':'💡 Sugestões de Perguntas'}
+                {t==='upload'?'📤 Enviar Matéria':'💡 Sugestões'}
               </button>
             ))}
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl hover:bg-white/5 transition-all"><X className="w-5 h-5 text-white/50"/></button>
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-white/5 transition-all shrink-0"><X className="w-5 h-5 text-white/50"/></button>
         </div>
         <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           {tab==='upload' && (
@@ -137,12 +137,12 @@ function TeacherModal({isOpen,onClose}:{isOpen:boolean;onClose:()=>void}) {
               </div>
               <div>
                 <label className="text-xs font-bold uppercase tracking-widest mb-2 block" style={{color:`${T.accent}99`}}>Ficheiro</label>
-                <div className="relative border-2 border-dashed border-white/10 hover:border-emerald-500/30 rounded-2xl p-8 text-center transition-all cursor-pointer group">
+                <div className="relative border-2 border-dashed border-white/10 hover:border-emerald-500/30 rounded-2xl p-6 sm:p-8 text-center transition-all cursor-pointer group">
                   <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e=>setFile(e.target.files?.[0]||null)}/>
                   {file?(
                     <div className="flex flex-col items-center gap-3" style={{color:T.accent}}>
                       <CheckCircle2 className="w-10 h-10"/>
-                      <div><p className="font-bold">{file.name}</p><p className="text-xs text-white/40 mt-1">{(file.size/1024/1024).toFixed(2)} MB</p></div>
+                      <div><p className="font-bold break-all">{file.name}</p><p className="text-xs text-white/40 mt-1">{(file.size/1024/1024).toFixed(2)} MB</p></div>
                     </div>
                   ):(
                     <div className="text-white/30 flex flex-col items-center gap-3 group-hover:text-white/50 transition-colors">
@@ -172,9 +172,9 @@ function TeacherModal({isOpen,onClose}:{isOpen:boolean;onClose:()=>void}) {
               </div>
               <div>
                 <label className="text-xs font-bold uppercase tracking-widest mb-2 block" style={{color:`${T.accent}99`}}>Nível de Dificuldade</label>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap sm:flex-nowrap gap-2">
                   {(['básico','intermédio','avançado'] as const).map(l=>(
-                    <button key={l} onClick={()=>setQLevel(l)} className="flex-1 py-2.5 rounded-xl text-xs font-bold capitalize transition-all"
+                    <button key={l} onClick={()=>setQLevel(l)} className="flex-1 min-w-[28%] sm:min-w-0 py-2.5 rounded-xl text-xs font-bold capitalize transition-all"
                       style={qLevel===l?{background:T.accent,color:'#000'}:{background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',color:'rgba(255,255,255,0.4)'}}>
                       {l}
                     </button>
@@ -187,7 +187,7 @@ function TeacherModal({isOpen,onClose}:{isOpen:boolean;onClose:()=>void}) {
               </button>
               {questions.length>0&&(
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
                     <h4 className="font-bold text-sm text-white/70">{questions.length} perguntas geradas</h4>
                     <div className="flex gap-2">
                       <button onClick={generateQuestions} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-all" title="Regenerar"><RefreshCw className="w-4 h-4 text-white/50"/></button>
@@ -200,7 +200,7 @@ function TeacherModal({isOpen,onClose}:{isOpen:boolean;onClose:()=>void}) {
                   {questions.map((q,i)=>(
                     <div key={i} className="group flex items-start gap-3 p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06] hover:border-emerald-500/20 transition-all">
                       <span className="w-6 h-6 rounded-lg text-xs font-black flex items-center justify-center shrink-0 mt-0.5" style={{background:T.dim,color:T.accent}}>{i+1}</span>
-                      <p className="flex-1 text-sm text-white/75 leading-relaxed">{q}</p>
+                      <p className="flex-1 text-sm text-white/75 leading-relaxed min-w-0">{q}</p>
                       <button onClick={()=>copyQ(q,i)} className="shrink-0 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-white/10 transition-all">
                         {copiedIdx===i?<Check className="w-3.5 h-3.5" style={{color:T.accent}}/>:<Copy className="w-3.5 h-3.5 text-white/40"/>}
                       </button>
@@ -285,21 +285,21 @@ export default function TeacherDashboard() {
       {/* NAVBAR */}
       <nav className={`fixed top-0 w-full z-[100] transition-all duration-500 ${scrolled?'py-2':'py-5'}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className={`flex items-center justify-between px-4 sm:px-6 py-3 rounded-2xl border transition-all duration-500 ${scrolled?'bg-black/50 border-white/10 backdrop-blur-xl':'bg-transparent border-transparent'}`}>
-            <div className="flex items-center gap-3">
-              <img src={avesLogo} className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl border border-white/20" alt="Logo"/>
-              <span className={`text-lg sm:text-2xl font-black tracking-tighter bg-gradient-to-r ${T.grad} bg-clip-text text-transparent`}>
-                A.V.E.S <span className="text-white/30 text-sm font-medium">PROF</span>
+          <div className={`flex items-center justify-between gap-2 px-3 sm:px-6 py-3 rounded-2xl border transition-all duration-500 ${scrolled?'bg-black/50 border-white/10 backdrop-blur-xl':'bg-transparent border-transparent'}`}>
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <img src={avesLogo} className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl border border-white/20 shrink-0" alt="Logo"/>
+              <span className={`text-base sm:text-2xl font-black tracking-tighter bg-gradient-to-r ${T.grad} bg-clip-text text-transparent whitespace-nowrap`}>
+                A.V.E.S <span className="hidden sm:inline text-white/30 text-sm font-medium">PROF</span>
               </span>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
               {user&&(
-                <div className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white/60">
-                  <div className="w-2 h-2 rounded-full animate-pulse" style={{background:T.accent}}/>
-                  {user.email?.split('@')[0]}
+                <div className="hidden md:flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white/60 max-w-[140px]">
+                  <div className="w-2 h-2 rounded-full animate-pulse shrink-0" style={{background:T.accent}}/>
+                  <span className="truncate">{user.email?.split('@')[0]}</span>
                 </div>
               )}
-              <button onClick={handleLogout} className="p-2 sm:p-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-red-500/20 hover:border-red-500/30 transition-all">
+              <button onClick={handleLogout} className="p-2 sm:p-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-red-500/20 hover:border-red-500/30 transition-all shrink-0">
                 <LogOut className="w-4 h-4 sm:w-5 sm:h-5"/>
               </button>
             </div>
@@ -314,29 +314,29 @@ export default function TeacherDashboard() {
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold tracking-widest uppercase" style={{background:T.dim,border:`1px solid ${T.border}`,color:T.accent}}>
               <Sparkles className="w-3 h-3"/> Gestão de Saber
             </div>
-            <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black leading-[0.9] tracking-tight">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-black leading-[0.95] sm:leading-[0.9] tracking-tight">
               Organize o <br/>
               <span className={`bg-gradient-to-r ${T.grad} bg-clip-text text-transparent`}>Futuro.</span>
             </h1>
             <p className="text-base sm:text-lg text-white/60 leading-relaxed max-w-xl mx-auto lg:mx-0">
               Gere conteúdos, envia materiais e usa IA para criar perguntas e transformar o ensino.
             </p>
-            <div className="flex flex-wrap gap-4 justify-center lg:justify-start">
-              <button onClick={()=>navigate('/chat',{state:{role:'professor'}})} className="group relative px-6 sm:px-8 py-3.5 sm:py-4 bg-purple-600 rounded-2xl overflow-hidden transition-all hover:scale-105 shadow-[0_20px_50px_rgba(147,51,234,0.3)] font-bold flex items-center gap-3">
+            <div className="flex flex-col sm:flex-row flex-wrap gap-4 justify-center lg:justify-start">
+              <button onClick={()=>navigate('/chat',{state:{role:'professor'}})} className="group relative w-full sm:w-auto px-6 sm:px-8 py-3.5 sm:py-4 bg-purple-600 rounded-2xl overflow-hidden transition-all hover:scale-105 shadow-[0_20px_50px_rgba(147,51,234,0.3)] font-bold flex items-center justify-center gap-3">
                 <div className="absolute inset-0 bg-gradient-to-r from-purple-400 to-fuchsia-500 opacity-0 group-hover:opacity-100 transition-opacity"/>
                 <div className="relative flex items-center gap-3"><MessageSquare className="w-5 h-5"/> Testar IA</div>
               </button>
-              <button onClick={()=>navigate('/vision')} className="px-6 sm:px-8 py-3.5 sm:py-4 rounded-2xl transition-all hover:scale-105 font-bold flex items-center gap-3" style={{background:T.dim,border:`1px solid ${T.border}`,color:T.accent}}>
+              <button onClick={()=>navigate('/vision')} className="w-full sm:w-auto px-6 sm:px-8 py-3.5 sm:py-4 rounded-2xl transition-all hover:scale-105 font-bold flex items-center justify-center gap-3" style={{background:T.dim,border:`1px solid ${T.border}`,color:T.accent}}>
                 <Eye className="w-5 h-5"/> Visão IA
               </button>
-              <button onClick={()=>setIsModalOpen(true)} className="px-6 sm:px-8 py-3.5 sm:py-4 rounded-2xl transition-all hover:scale-105 font-bold flex items-center gap-3 text-black" style={{background:T.gradCss,boxShadow:`0 20px 50px ${T.glow}`}}>
+              <button onClick={()=>setIsModalOpen(true)} className="w-full sm:w-auto px-6 sm:px-8 py-3.5 sm:py-4 rounded-2xl transition-all hover:scale-105 font-bold flex items-center justify-center gap-3 text-black" style={{background:T.gradCss,boxShadow:`0 20px 50px ${T.glow}`}}>
                 <Upload className="w-5 h-5"/> Enviar Matéria
               </button>
             </div>
           </div>
-          <div className="relative flex justify-center mt-4 lg:mt-0 scale-x-[-1]">
+          <div className="relative flex justify-center mt-4 lg:mt-0 w-full max-w-[280px] sm:max-w-[380px] lg:max-w-none mx-auto scale-x-[-1]">
             <AnimatedChickenMascot size="large"/>
-            <div className="absolute w-[350px] sm:w-[500px] h-[350px] sm:h-[500px] rounded-full -z-10 animate-pulse" style={{background:`${T.accent}10`,filter:'blur(120px)'}}/>
+            <div className="absolute w-[260px] sm:w-[380px] md:w-[500px] h-[260px] sm:h-[380px] md:h-[500px] rounded-full -z-10 animate-pulse" style={{background:`${T.accent}10`,filter:'blur(120px)'}}/>
           </div>
         </div>
       </section>
@@ -347,7 +347,7 @@ export default function TeacherDashboard() {
           <div className="inline-flex bg-white/[0.03] border border-white/[0.08] rounded-2xl p-1 gap-1 min-w-max">
             {TABS.map(tab=>(
               <button key={tab.id} onClick={()=>setActiveTab(tab.id)}
-                className="px-5 sm:px-8 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap"
+                className="px-4 sm:px-8 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap"
                 style={activeTab===tab.id
                   ?{background:T.accent,color:'#000',boxShadow:`0 4px 12px ${T.glow}`}
                   :{color:'rgba(255,255,255,0.4)'}}>
@@ -362,15 +362,15 @@ export default function TeacherDashboard() {
       {activeTab==='materias'&&(
         <section className="relative z-10 px-4 sm:px-6 pb-20 sm:pb-32">
           <div className="max-w-7xl mx-auto">
-            <div className="flex items-center justify-between mb-8 sm:mb-10">
+            <div className="flex items-center justify-between gap-2 flex-wrap mb-8 sm:mb-10">
               <div className="flex items-center gap-3">
                 <BookOpen className="w-6 h-6 sm:w-7 sm:h-7" style={{color:T.accent}}/>
-                <h2 className="text-3xl sm:text-4xl font-black">Matérias Geridas</h2>
+                <h2 className="text-2xl sm:text-3xl md:text-4xl font-black">Matérias Geridas</h2>
               </div>
               <span className="text-sm text-white/30 font-medium">{materias.length} publicadas</span>
             </div>
             {materias.length===0?(
-              <div className="bg-white/5 border border-white/10 rounded-3xl p-10 sm:p-16 text-center">
+              <div className="bg-white/5 border border-white/10 rounded-3xl p-8 sm:p-16 text-center">
                 <BookOpen className="w-12 h-12 text-white/10 mx-auto mb-4"/>
                 <p className="text-white/40 mb-6">Ainda não publicaste nenhum conteúdo.</p>
                 <button onClick={()=>setIsModalOpen(true)} className="px-6 py-3 rounded-2xl font-bold transition-all flex items-center gap-2 mx-auto text-black" style={{background:T.gradCss}}>
@@ -378,20 +378,20 @@ export default function TeacherDashboard() {
                 </button>
               </div>
             ):(
-              <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-5 sm:gap-8">
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5 sm:gap-8">
                 {materias.map(m=>(
                   <div key={m.id} className="group relative bg-white/5 border border-white/10 rounded-3xl overflow-hidden transition-all backdrop-blur-xl hover:border-emerald-500/30">
                     <div className="h-px" style={{background:`linear-gradient(90deg,transparent,${T.accent}40,transparent)`}}/>
                     <div className="p-5 sm:p-7">
-                      <div className="flex items-start justify-between mb-5">
+                      <div className="flex items-start justify-between gap-2 mb-5">
                         <div className="p-3 sm:p-4 rounded-2xl" style={{background:T.dim,border:`1px solid ${T.border}`}}>
                           <BookOpen className="w-5 h-5 sm:w-6 sm:h-6" style={{color:T.accent}}/>
                         </div>
-                        <div className="flex items-center gap-2 text-white/30 text-xs">
+                        <div className="flex items-center gap-2 text-white/30 text-xs shrink-0">
                           <Calendar className="w-3.5 h-3.5"/>{formatDate(m.dataCriacao)}
                         </div>
                       </div>
-                      <h3 className="text-xl sm:text-2xl font-black mb-3 leading-tight group-hover:text-emerald-400 transition-colors">{m.titulo}</h3>
+                      <h3 className="text-xl sm:text-2xl font-black mb-3 leading-tight group-hover:text-emerald-400 transition-colors break-words">{m.titulo}</h3>
                       <p className="text-white/50 leading-relaxed text-sm line-clamp-2 mb-4">{m.descricao}</p>
                       <button onClick={()=>setExpandedId(expandedId===m.id?null:m.id)}
                         className="flex items-center gap-1 text-[11px] font-bold mb-4 transition-colors" style={{color:`${T.accent}80`}}>
@@ -404,7 +404,7 @@ export default function TeacherDashboard() {
                         <button onClick={()=>setIsModalOpen(true)} className="flex-1 py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5" style={{background:T.dim,border:`1px solid ${T.border}`,color:T.accent}}>
                           <Brain className="w-3.5 h-3.5"/> Gerar Perguntas
                         </button>
-                        <button onClick={()=>handleDelete(m.id,m.titulo)} className="py-3 px-4 rounded-xl border border-red-500/20 bg-red-500/5 text-red-400 hover:bg-red-500 hover:text-white transition-all">
+                        <button onClick={()=>handleDelete(m.id,m.titulo)} className="py-3 px-4 rounded-xl border border-red-500/20 bg-red-500/5 text-red-400 hover:bg-red-500 hover:text-white transition-all shrink-0">
                           <Trash2 className="w-4 h-4"/>
                         </button>
                       </div>
@@ -422,12 +422,12 @@ export default function TeacherDashboard() {
         <section className="relative z-10 px-4 sm:px-6 pb-20 sm:pb-32">
           <div className="max-w-5xl mx-auto space-y-8">
 
-            <div className="rounded-3xl p-8 sm:p-12 border flex flex-col lg:flex-row items-center gap-10" style={{background:`linear-gradient(135deg,${T.dim},rgba(20,184,166,0.04))`,borderColor:T.border}}>
+            <div className="rounded-3xl p-6 sm:p-8 md:p-12 border flex flex-col lg:flex-row items-center gap-8 lg:gap-10" style={{background:`linear-gradient(135deg,${T.dim},rgba(20,184,166,0.04))`,borderColor:T.border}}>
               <div className="flex-1 text-center lg:text-left space-y-4">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold tracking-widest uppercase" style={{background:T.dim,border:`1px solid ${T.border}`,color:T.accent}}>
                   <Sparkles className="w-3 h-3"/> Inovação Tecnológica
                 </div>
-                <h2 className="text-4xl sm:text-5xl font-black leading-tight">
+                <h2 className="text-3xl sm:text-4xl md:text-5xl font-black leading-tight">
                   Sobre o <span className={`bg-gradient-to-r ${T.grad} bg-clip-text text-transparent`}>A.V.E.S</span>
                 </h2>
                 <p className="text-white/50 leading-relaxed">
@@ -437,15 +437,15 @@ export default function TeacherDashboard() {
                   <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"/> Status: Operacional
                 </div>
               </div>
-              <div className="relative shrink-0">
+              <div className="relative shrink-0 w-full max-w-[220px] sm:max-w-[260px] lg:max-w-none mx-auto">
                 <div className="absolute inset-0 rounded-full blur-[60px]" style={{background:`${T.accent}20`}}/>
-                <div className="relative p-8 rounded-3xl bg-black/30 border border-white/10 backdrop-blur-2xl scale-x-[-1]">
+                <div className="relative p-6 sm:p-8 rounded-3xl bg-black/30 border border-white/10 backdrop-blur-2xl scale-x-[-1]">
                   <AnimatedChickenMascot size="medium" isGesturing/>
                 </div>
               </div>
             </div>
 
-            <div className="grid sm:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {[
                 {icon:Target, title:'Missão',    desc:'Tornar a IA acessível para professores — gerando perguntas, organizando matérias e transformando o ensino.'},
                 {icon:Rocket, title:'Visão',     desc:'Ser referência em educação aumentada por IA no contexto africano e lusófono.'},
@@ -461,20 +461,20 @@ export default function TeacherDashboard() {
               ))}
             </div>
 
-            <div className="p-8 rounded-3xl border" style={{background:`linear-gradient(135deg,${T.dim},transparent)`,borderColor:T.border}}>
+            <div className="p-6 sm:p-8 rounded-3xl border" style={{background:`linear-gradient(135deg,${T.dim},transparent)`,borderColor:T.border}}>
               <h3 className="font-black text-xl mb-6 flex items-center gap-3">
                 <Users className="w-5 h-5" style={{color:T.accent}}/> Core Team
               </h3>
-              <div className="grid sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {[
                   {name:'Tudilu Manuel',   role:'Lead Developer', emoji:'🔥'},
                   {name:'Elijah Gomes',    role:'AI Specialist',  emoji:'⚙️'},
                   {name:'Kiami De Almeida',role:'UI Designer',    emoji:'🎨'},
                 ].map((m,i)=>(
-                  <div key={i} className="flex items-center gap-4 p-4 rounded-2xl bg-black/30 border border-white/[0.06] hover:border-emerald-500/20 transition-all group">
-                    <div className="w-11 h-11 rounded-2xl bg-white/5 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">{m.emoji}</div>
-                    <div>
-                      <p className="font-black text-sm">{m.name}</p>
+                  <div key={i} className="flex items-center gap-4 p-4 rounded-2xl bg-black/30 border border-white/[0.06] hover:border-emerald-500/20 transition-all group min-w-0">
+                    <div className="w-11 h-11 rounded-2xl bg-white/5 flex items-center justify-center text-xl group-hover:scale-110 transition-transform shrink-0">{m.emoji}</div>
+                    <div className="min-w-0">
+                      <p className="font-black text-sm truncate">{m.name}</p>
                       <p className="text-[10px] font-bold uppercase tracking-widest" style={{color:T.accent}}>{m.role}</p>
                     </div>
                   </div>
@@ -482,11 +482,11 @@ export default function TeacherDashboard() {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-3 gap-3 sm:gap-4">
               {[{val:'100%',label:'Student Dev'},{val:'V2.0',label:'Build'},{val:'∞',label:'Future'}].map((s,i)=>(
-                <div key={i} className="p-5 rounded-2xl bg-white/[0.03] border border-white/[0.08] text-center group hover:border-emerald-500/20 transition-all">
-                  <p className="text-2xl sm:text-3xl font-black" style={{color:T.accent}}>{s.val}</p>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-white/30 mt-1">{s.label}</p>
+                <div key={i} className="p-3 sm:p-5 rounded-2xl bg-white/[0.03] border border-white/[0.08] text-center group hover:border-emerald-500/20 transition-all">
+                  <p className="text-xl sm:text-2xl md:text-3xl font-black" style={{color:T.accent}}>{s.val}</p>
+                  <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-white/30 mt-1">{s.label}</p>
                 </div>
               ))}
             </div>
@@ -504,11 +504,11 @@ export default function TeacherDashboard() {
           <div className="max-w-5xl mx-auto space-y-8">
 
             <div className="text-center space-y-3">
-              <h2 className="text-4xl sm:text-5xl font-black">Entre em <span className={`bg-gradient-to-r ${T.grad} bg-clip-text text-transparent`}>Contacto</span></h2>
-              <p className="text-white/40">Estamos aqui para ajudar. Resposta em até 24 horas.</p>
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-black">Entre em <span className={`bg-gradient-to-r ${T.grad} bg-clip-text text-transparent`}>Contacto</span></h2>
+              <p className="text-white/40 text-sm sm:text-base">Estamos aqui para ajudar. Resposta em até 24 horas.</p>
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold" style={{background:T.dim,border:`1px solid ${T.border}`,color:T.accent}}>
-                <div className="w-1.5 h-1.5 rounded-full animate-ping" style={{background:T.accent}}/>
-                ⚡ Resposta em até 24 horas
+                <div className="w-1.5 h-1.5 rounded-full animate-ping shrink-0" style={{background:T.accent}}/>
+                <span className="whitespace-nowrap">⚡ Resposta em até 24 horas</span>
               </div>
             </div>
 
@@ -519,13 +519,13 @@ export default function TeacherDashboard() {
                   {icon:Phone, title:'Telefone',    lines:['+244 923 456 789','Seg - Sex: 8h - 18h']},
                   {icon:MapPin,title:'Localização', lines:['Luanda, Angola','Centro Tecnológico']},
                 ].map(({icon:Icon,title,lines},i)=>(
-                  <div key={i} className="p-5 rounded-2xl bg-white/[0.03] border border-white/[0.08] hover:border-emerald-500/20 flex items-center gap-4 transition-all group">
+                  <div key={i} className="p-5 rounded-2xl bg-white/[0.03] border border-white/[0.08] hover:border-emerald-500/20 flex items-center gap-4 transition-all group min-w-0">
                     <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform" style={{background:T.dim,border:`1px solid ${T.border}`}}>
                       <Icon className="w-5 h-5" style={{color:T.accent}}/>
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-xs font-black uppercase tracking-widest text-white/30 mb-1">{title}</p>
-                      {lines.map((l,j)=><p key={j} className="text-sm text-white/70 font-medium">{l}</p>)}
+                      {lines.map((l,j)=><p key={j} className="text-sm text-white/70 font-medium truncate">{l}</p>)}
                     </div>
                   </div>
                 ))}
@@ -541,7 +541,7 @@ export default function TeacherDashboard() {
                 </div>
               </div>
 
-              <div className="p-6 sm:p-8 rounded-3xl border space-y-4" style={{background:`linear-gradient(135deg,${T.dim},rgba(20,184,166,0.03))`,borderColor:T.border}}>
+              <div className="p-5 sm:p-6 md:p-8 rounded-3xl border space-y-4" style={{background:`linear-gradient(135deg,${T.dim},rgba(20,184,166,0.03))`,borderColor:T.border}}>
                 <h3 className="text-xl font-black mb-2">Envie a sua <span style={{color:T.accent}}>Mensagem</span></h3>
                 {[
                   {id:'name',    placeholder:'Nome completo',        type:'text'},

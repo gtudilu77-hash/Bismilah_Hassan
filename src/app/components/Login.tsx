@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { ChickenMascot } from './ChickenMascot';
 import { Sparkles, Lock, Mail, Eye, EyeOff, Chrome, Github, ArrowRight } from 'lucide-react';
 import { ForgotPasswordModal } from './ForgotPasswordModal';
@@ -10,8 +10,7 @@ import {
   signInWithEmailAndPassword, 
   GoogleAuthProvider, 
   GithubAuthProvider, 
-  signInWithRedirect,
-  getRedirectResult
+  signInWithPopup
 } from 'firebase/auth';
 
 // 🔥 FIRESTORE
@@ -31,34 +30,6 @@ export function Login({ onLogin }: LoginProps) {
   // MODALS
   const [openForgot, setOpenForgot] = useState(false);
   const [openSignUp, setOpenSignUp] = useState(false);
-
-  useEffect(() => {
-    getRedirectResult(auth).then(async (result) => {
-      console.log("REDIRECT RESULT:", result);
-      if (!result?.user) {
-        console.log("Sem utilizador no redirect");
-        return;
-      }
-      const user = result.user;
-      console.log("Utilizador:", user.email);
-
-      const userRef = doc(db, "users", user.uid);
-      const userSnap = await getDoc(userRef);
-
-      if (!userSnap.exists()) {
-        await setDoc(userRef, {
-          uid: user.uid,
-          email: user.email,
-          name: user.displayName || user.email?.split("@")[0],
-          photo: user.photoURL || "",
-          createdAt: new Date()
-        });
-      }
-      onLogin();
-    }).catch((error) => {
-      console.error("REDIRECT ERRO:", error);
-    });
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,7 +62,22 @@ export function Login({ onLogin }: LoginProps) {
   const handleGoogleLogin = async () => {
     try {
       const provider = new GoogleAuthProvider();
-      await signInWithRedirect(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
+
+      if (!userSnap.exists()) {
+        await setDoc(userRef, {
+          uid: user.uid,
+          email: user.email,
+          name: user.displayName || user.email?.split("@")[0],
+          photo: user.photoURL || "",
+          createdAt: new Date()
+        });
+      }
+      onLogin();
     } catch (error: any) {
       alert(error.message);
     }
@@ -100,7 +86,22 @@ export function Login({ onLogin }: LoginProps) {
   const handleGithubLogin = async () => {
     try {
       const provider = new GithubAuthProvider();
-      await signInWithRedirect(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
+
+      if (!userSnap.exists()) {
+        await setDoc(userRef, {
+          uid: user.uid,
+          email: user.email,
+          name: user.displayName || user.email?.split("@")[0],
+          photo: user.photoURL || "",
+          createdAt: new Date()
+        });
+      }
+      onLogin();
     } catch (error: any) {
       alert(error.message);
     }

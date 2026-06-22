@@ -45,7 +45,7 @@ export function Contact() {
 };
 
   return (
-    <div className="min-h-screen bg-[#050208] text-white flex flex-col relative overflow-hidden font-sans">
+    <div className="min-h-screen bg-[#050208] text-white flex flex-col relative overflow-x-hidden font-sans">
       
       {/* 🌌 BACKGROUND FX - Consistência Visual A.V.E.S */}
       <div className="fixed inset-0 z-0 pointer-events-none">
@@ -56,74 +56,74 @@ export function Contact() {
       </div>
 
       {/* 🔥 HEADER - Glassmorphism */}
-      <header className="relative z-30 flex items-center justify-between px-8 py-6 border-b border-white/5 bg-black/20 backdrop-blur-3xl sticky top-0">
-        <div className="flex items-center gap-4 group cursor-default">
-          <div className="relative">
+      <header className="relative z-30 flex items-center justify-between gap-3 px-4 sm:px-8 py-4 sm:py-6 border-b border-white/5 bg-black/20 backdrop-blur-3xl sticky top-0">
+        <div className="flex items-center gap-2 sm:gap-4 group cursor-default min-w-0">
+          <div className="relative shrink-0">
             <div className="absolute -inset-1 bg-purple-500/40 blur-md rounded-lg opacity-0 group-hover:opacity-100 transition-opacity" />
-            <img src={avesLogo} className="relative w-12 h-12 object-cover rounded-xl border border-white/10 shadow-2xl" />
+            <img src={avesLogo} className="relative w-10 h-10 sm:w-12 sm:h-12 object-cover rounded-xl border border-white/10 shadow-2xl" />
           </div>
-          <div className="flex flex-col text-left">
-            <span className="text-xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-white via-purple-200 to-fuchsia-200">
+          <div className="flex flex-col text-left min-w-0">
+            <span className="text-base sm:text-xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-white via-purple-200 to-fuchsia-200 whitespace-nowrap">
               A.V.E.S
             </span>
-            <span className="text-[9px] font-black uppercase tracking-[0.3em] text-purple-400/60 text-left">Neural Link</span>
+            <span className="hidden sm:block text-[9px] font-black uppercase tracking-[0.3em] text-purple-400/60 text-left">Neural Link</span>
           </div>
         </div>
 
         <button
           onClick={() => navigate("/")}
-          className="group flex items-center gap-2 px-6 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white font-bold text-xs uppercase tracking-widest hover:bg-white hover:text-black transition-all duration-300 shadow-xl"
+          className="group flex items-center gap-2 px-3 sm:px-6 py-2 sm:py-2.5 rounded-xl bg-white/5 border border-white/10 text-white font-bold text-[10px] sm:text-xs uppercase tracking-widest hover:bg-white hover:text-black transition-all duration-300 shadow-xl shrink-0"
         >
           <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-          Voltar
+          <span className="hidden sm:inline">Voltar</span>
         </button>
       </header>
 
       <main className="relative z-10 flex-1 overflow-y-auto custom-scrollbar">
         
         {/* 🔥 HERO SECTION */}
-        <section className="text-center pt-16 pb-8 px-6">
-          <h1 className="text-5xl md:text-6xl font-black text-white tracking-tighter mb-4 leading-none">
+        <section className="text-center pt-12 sm:pt-16 pb-8 px-4 sm:px-6">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl font-black text-white tracking-tighter mb-4 leading-tight sm:leading-none">
             Entre em <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-fuchsia-400 to-violet-500">Contato</span>
           </h1>
-          <p className="text-white/40 mt-4 max-w-xl mx-auto font-medium">
+          <p className="text-white/40 mt-4 max-w-xl mx-auto font-medium text-sm sm:text-base">
             Estamos aqui para ajudar! Envie sua mensagem e nossa rede neural responderá rapidamente.
           </p>
-          <div className="mt-8 inline-flex items-center gap-2 px-5 py-2 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-300 text-xs font-black uppercase tracking-widest shadow-[0_0_20px_rgba(168,85,247,0.1)]">
-            <div className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-ping" />
-            ⚡ Resposta em até 24 horas
+          <div className="mt-8 inline-flex items-center gap-2 px-4 sm:px-5 py-2 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-300 text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-[0_0_20px_rgba(168,85,247,0.1)]">
+            <div className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-ping shrink-0" />
+            <span className="whitespace-nowrap">⚡ Resposta em até 24 horas</span>
           </div>
         </section>
 
         {/* 🔥 MASCOTE - Floating Style */}
-        <div className="relative z-10 flex justify-center py-6">
-          <div className="relative group">
+        <div className="relative z-10 flex justify-center py-6 px-4">
+          <div className="relative group w-full max-w-[220px] sm:max-w-none">
             <div className="absolute inset-0 bg-purple-600/20 blur-[60px] rounded-full group-hover:bg-purple-600/30 transition-all duration-700" />
-            <div className="relative p-6 rounded-3xl bg-white/[0.03] border border-white/10 backdrop-blur-3xl shadow-2xl transition-transform duration-500 group-hover:scale-105">
+            <div className="relative p-4 sm:p-6 rounded-3xl bg-white/[0.03] border border-white/10 backdrop-blur-3xl shadow-2xl transition-transform duration-500 group-hover:scale-105">
               <AnimatedChickenMascot size="medium" isGesturing />
             </div>
           </div>
         </div>
 
         {/* 🔥 MAIN CONTENT GRID */}
-        <section className="max-w-7xl mx-auto px-8 py-12 grid md:grid-cols-2 gap-10 items-start">
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-8 sm:py-12 grid md:grid-cols-2 gap-6 sm:gap-10 items-start">
 
           {/* LEFT SIDE - Info Cards */}
           <div className="space-y-6">
             {[
               { title: "Email", icon: Mail, content: ["contato@aves.ai", "suporte@aves.ai"], color: "blue" },
-              { title: "Telefone", icon: Phone, content: ["+244 923 456 789", "Seg - Sex: 8h - 18h"], color: "purple" },
+              { title: "Telefone", icon: Phone, content: ["+244 935 140 361", "Seg - Sex: 8h - 18h"], color: "purple" },
               { title: "Localização", icon: MapPin, content: ["Luanda, Angola", "Centro Tecnológico"], color: "fuchsia" },
             ].map((item, i) => (
-              <div key={i} className="group p-6 rounded-[2rem] border border-white/5 bg-white/[0.02] backdrop-blur-2xl hover:border-purple-500/30 hover:bg-white/[0.04] transition-all duration-500 shadow-xl relative overflow-hidden">
-                <div className="flex items-center gap-4">
-                   <div className="w-12 h-12 rounded-2xl bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:scale-110 group-hover:bg-purple-500 group-hover:text-white transition-all">
+              <div key={i} className="group p-5 sm:p-6 rounded-[2rem] border border-white/5 bg-white/[0.02] backdrop-blur-2xl hover:border-purple-500/30 hover:bg-white/[0.04] transition-all duration-500 shadow-xl relative overflow-hidden">
+                <div className="flex items-center gap-4 min-w-0">
+                   <div className="w-12 h-12 rounded-2xl bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:scale-110 group-hover:bg-purple-500 group-hover:text-white transition-all shrink-0">
                       <item.icon size={22} />
                    </div>
-                   <div>
+                   <div className="min-w-0">
                       <h3 className="text-white font-black uppercase tracking-widest text-xs mb-1 opacity-40 group-hover:opacity-100 transition-opacity">{item.title}</h3>
                       {item.content.map((text, j) => (
-                        <p key={j} className="text-white font-medium text-sm leading-relaxed">{text}</p>
+                        <p key={j} className="text-white font-medium text-sm leading-relaxed truncate">{text}</p>
                       ))}
                    </div>
                 </div>
@@ -131,11 +131,11 @@ export function Contact() {
             ))}
 
             {/* Redes Sociais Card */}
-            <div className="p-6 rounded-[2rem] border border-white/5 bg-gradient-to-br from-purple-900/10 to-transparent backdrop-blur-2xl">
+            <div className="p-5 sm:p-6 rounded-[2rem] border border-white/5 bg-gradient-to-br from-purple-900/10 to-transparent backdrop-blur-2xl">
               <h3 className="text-white font-black uppercase tracking-widest text-[10px] mb-6 flex items-center gap-2">
                 <Globe size={14} className="text-purple-500" /> Canais Oficiais
               </h3>
-              <div className="flex gap-4">
+              <div className="flex gap-3 sm:gap-4 flex-wrap">
                 {[
                   { icon: <Facebook size={18} />, name: "Facebook" },
                   { icon: <Twitter size={18} />, name: "Twitter" },
@@ -144,7 +144,7 @@ export function Contact() {
                 ].map((item, i) => (
                   <button
                     key={i}
-                    className="w-12 h-12 flex items-center justify-center rounded-2xl bg-white/5 border border-white/10 text-white/40 hover:text-white hover:bg-purple-600 hover:border-purple-400 hover:scale-110 hover:rotate-3 transition-all duration-300 shadow-lg"
+                    className="w-11 h-11 sm:w-12 sm:h-12 flex items-center justify-center rounded-2xl bg-white/5 border border-white/10 text-white/40 hover:text-white hover:bg-purple-600 hover:border-purple-400 hover:scale-110 hover:rotate-3 transition-all duration-300 shadow-lg shrink-0"
                     title={item.name}
                   >
                     {item.icon}
@@ -155,12 +155,12 @@ export function Contact() {
           </div>
 
           {/* RIGHT SIDE - FORM (Acabamento Pro) */}
-          <div className="p-10 rounded-[3rem] border border-white/10 bg-white/[0.03] backdrop-blur-3xl shadow-3xl space-y-5 relative overflow-hidden">
+          <div className="p-5 sm:p-8 md:p-10 rounded-[2rem] sm:rounded-[3rem] border border-white/10 bg-white/[0.03] backdrop-blur-3xl shadow-3xl space-y-5 relative overflow-hidden">
             <div className="absolute top-0 right-0 p-10 opacity-[0.02] pointer-events-none">
                 <Send size={150} />
             </div>
             
-            <h2 className="text-2xl font-black text-white mb-6 tracking-tighter">
+            <h2 className="text-xl sm:text-2xl font-black text-white mb-6 tracking-tighter">
               Envie sua <span className="text-purple-400">Mensagem</span>
             </h2>
 
@@ -184,13 +184,13 @@ export function Contact() {
                 placeholder="Como podemos ajudar?"
                 value={form.message}
                 onChange={(e) => setForm({ ...form, message: e.target.value })}
-                className="w-full p-4 rounded-2xl bg-black/40 border border-white/5 text-white placeholder:text-white/10 h-40 focus:outline-none focus:border-purple-500/50 focus:bg-black/60 focus:ring-1 focus:ring-purple-500/20 transition-all font-medium text-sm resize-none"
+                className="w-full p-4 rounded-2xl bg-black/40 border border-white/5 text-white placeholder:text-white/10 h-32 sm:h-40 focus:outline-none focus:border-purple-500/50 focus:bg-black/60 focus:ring-1 focus:ring-purple-500/20 transition-all font-medium text-sm resize-none"
               />
 
              <button
   type="button"
   onClick={handleSubmit}
-  className="w-full py-5 rounded-2xl text-white font-black text-xs uppercase tracking-[0.3em] bg-gradient-to-r from-purple-600 via-violet-600 to-fuchsia-600"
+  className="w-full py-4 sm:py-5 rounded-2xl text-white font-black text-[10px] sm:text-xs uppercase tracking-[0.15em] sm:tracking-[0.3em] bg-gradient-to-r from-purple-600 via-violet-600 to-fuchsia-600"
 >
   Transmitir Mensagem
 </button>
@@ -199,16 +199,16 @@ export function Contact() {
         </section>
 
         {/* 🔥 STATS STRIP */}
-        <section className="max-w-7xl mx-auto px-8 pb-16 pt-8">
-           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 pb-16 pt-8">
+           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
               {[
                 { value: "24h", label: "Response Time" },
                 { value: "100%", label: "Satisfaction" },
                 { value: "24/7", label: "Live Support" },
                 { value: "∞", label: "Neural Flow" },
               ].map((item, i) => (
-                <div key={i} className="p-6 text-center rounded-3xl bg-white/[0.02] border border-white/5 hover:border-purple-500/20 transition-all group">
-                   <h3 className="text-3xl font-black text-white group-hover:scale-110 transition-transform">{item.value}</h3>
+                <div key={i} className="p-4 sm:p-6 text-center rounded-3xl bg-white/[0.02] border border-white/5 hover:border-purple-500/20 transition-all group">
+                   <h3 className="text-2xl sm:text-3xl font-black text-white group-hover:scale-110 transition-transform">{item.value}</h3>
                    <p className="text-[9px] font-black uppercase tracking-widest text-white/20 group-hover:text-purple-400 transition-colors">{item.label}</p>
                 </div>
               ))}
@@ -216,8 +216,8 @@ export function Contact() {
         </section>
 
         {/* 🔥 FOOTER */}
-        <footer className="text-center py-12 border-t border-white/5">
-          <p className="text-[10px] font-black uppercase tracking-[0.5em] text-white/10">
+        <footer className="text-center py-12 px-4 border-t border-white/5">
+          <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.15em] sm:tracking-[0.3em] md:tracking-[0.5em] text-white/10 break-words">
             ©️ 2026 A.V.E.S — Sistema de Inteligência Artificial // Luanda, Angola
           </p>
         </footer>
