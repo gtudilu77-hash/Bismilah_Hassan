@@ -13,36 +13,37 @@ from dotenv import load_dotenv
 # 🚀 ARRANQUE E CONFIGURAÇÃO DE AMBIENTE
 # ==========================================
 app = Flask(__name__)
-CORS(app)
+
+# ✅ CORS com origens explícitas — antes de tudo
+CORS(app, origins=[
+    "https://gtudilu77-hash.github.io",
+    "http://localhost:5173",
+    "http://localhost:3000",
+])
 
 print("🔥 A.V.E.S_OS — MODO DEFESA ATIVO...")
 
-# Carrega as variáveis do ficheiro .env local se ele existir
 load_dotenv()
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
-# Instanciação correta do cliente OpenAI usando a chave de ambiente
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 # ── Firebase ──────────────────────────────────────────────────────────────────
 db     = None
-bucket = None  # Storage bucket — usado para guardar as fotos de referência
+bucket = None
 import json
+
 firebase_json = os.getenv("FIREBASE_CREDENTIALS")
 if firebase_json:
     cred_dict = json.loads(firebase_json)
     cred = credentials.Certificate(cred_dict)
-
-    # Permite definir o bucket explicitamente; senão deriva do project_id
     storage_bucket = os.getenv("FIREBASE_STORAGE_BUCKET") or f"{cred_dict.get('project_id')}.appspot.com"
-
     firebase_admin.initialize_app(cred, {"storageBucket": storage_bucket})
     db     = firestore.client()
     bucket = storage.bucket()
     print(f"☁️  [FIREBASE] Ligado! Storage: {storage_bucket}")
 else:
-    print("❌  firebase-credentials.json não encontrado!")
+    print("❌  FIREBASE_CREDENTIALS não encontrado!")
 
 # ── YOLO ──────────────────────────────────────────────────────────────────────
 MODEL_PATH = "../yolov8n.pt"
@@ -50,11 +51,11 @@ model = YOLO(MODEL_PATH if os.path.exists(MODEL_PATH) else "yolov8n.pt")
 print("✅  Sensores YOLO prontos!")
 
 # ── Config ────────────────────────────────────────────────────────────────────
-CONFIANCA_MINIMA   = 0.45
-IDENTITY_TTL       = 90    # segundos até expirar a memória de identidade
-RECHECK_AFTER      = 25    # re-verifica identidade após N segundos
-MISS_THRESHOLD     = 3     # scans sem confirmar antes de apagar memória
-KNOWN_NAMES_TTL     = 300   # segundos até re-listar nomes conhecidos no Firestore
+CONFIANCA_MINIMA = 0.45
+IDENTITY_TTL     = 90    # segundos até expirar a memória de identidade
+RECHECK_AFTER    = 25    # re-verifica identidade após N segundos
+MISS_THRESHOLD   = 3     # scans sem confirmar antes de apagar memória
+KNOWN_NAMES_TTL  = 300   # segundos até re-listar nomes conhecidos no Firestore
 
 # ── Estado global ─────────────────────────────────────────────────────────────
 HISTORICO_CONVERSA      = []
@@ -62,10 +63,8 @@ ULTIMO_UTILIZADOR       = "Ambiente Mapeado"
 CACHE_FOTOS             = {}
 KNOWN_NAMES_CACHE       = {"names": [], "ts": 0}
 
-# Memória de identidades: { nome: { confirmed_at, last_seen, bbox_x_center, miss_count } }
 IDENTITY_MEMORY: dict = {}
 
-# Autónomo
 AUTONOMOUS_MODE         = False
 AUTONOMOUS_THREAD       = None
 LAST_AUTONOMOUS_FRAME   = None
@@ -95,10 +94,8 @@ def buscar_urls_fotos(nome: str) -> list:
 
 def obter_nomes_conhecidos() -> list:
     """
-    Lista todas as pessoas registadas no Firestore (cada documento da
-    coleção '1234' é uma pessoa). Substitui a lista hardcoded de nomes —
-    assim, registar alguém novo pelo /enroll passa automaticamente a
-    fazer parte do reconhecimento, sem alterar código.
+    Lista todas as pessoas registadas no Firestore.
+    Cache de 5 minutos para evitar leituras excessivas.
     """
     now = time.time()
     if KNOWN_NAMES_CACHE["names"] and (now - KNOWN_NAMES_CACHE["ts"] < KNOWN_NAMES_TTL):
@@ -149,46 +146,32 @@ def processar_yolo(results, img_w: int, img_h: int):
 # ✂️  CROP — foca na pessoa mais relevante
 # ==========================================
 def selecionar_pessoa_principal(detections: list, img_w: int, img_h: int) -> dict | None:
-    """
-    Entre todas as 'person' detetadas, escolhe a mais provável de ser o utilizador:
-    - Prioridade 1: pessoa mais próxima do centro horizontal da imagem
-    - Prioridade 2: maior área de bbox (mais perto da câmara)
-    Retorna o dict de deteção ou None.
-    """
     pessoas = [d for d in detections if d["label"] == "person"]
     if not pessoas:
         return None
 
-    centro_img = 0.5  # centro normalizado
+    centro_img = 0.5
 
     def score(d):
-        bn  = d["bbox_norm"]
-        cx  = bn["x"] + bn["width"]  / 2
-        cy  = bn["y"] + bn["height"] / 2
+        bn   = d["bbox_norm"]
+        cx   = bn["x"] + bn["width"]  / 2
         area = bn["width"] * bn["height"]
         dist_centro = abs(cx - centro_img)
-        # Score: área alta é bom, distância do centro é mau
         return area * 0.6 - dist_centro * 0.4
 
     return max(pessoas, key=score)
 
 
 def crop_pessoa(img: Image.Image, bbox_norm: dict) -> str:
-    """
-    Recorta a pessoa do frame e devolve base64.
-    Adiciona margem extra no topo para garantir que o rosto fica incluído.
-    """
     w, h = img.size
     x1 = max(0, int(bbox_norm["x"] * w))
     y1 = max(0, int(bbox_norm["y"] * h))
     x2 = min(w, int((bbox_norm["x"] + bbox_norm["width"])  * w))
     y2 = min(h, int((bbox_norm["y"] + bbox_norm["height"]) * h))
 
-    # Margem extra: 15% acima para incluir o topo da cabeça
     margem = int((y2 - y1) * 0.15)
     y1 = max(0, y1 - margem)
 
-    # Se o crop for demasiado pequeno, devolve frame completo
     if (x2 - x1) < 40 or (y2 - y1) < 40:
         buf = io.BytesIO()
         img.save(buf, format="JPEG", quality=85)
@@ -201,15 +184,9 @@ def crop_pessoa(img: Image.Image, bbox_norm: dict) -> str:
 
 
 # ==========================================
-# 👁️  RECONHECIMENTO FACIAL — crop focado
+# 👁️  RECONHECIMENTO FACIAL
 # ==========================================
 def reconhecer_pessoa_crop(crop_b64: str, verificar_primeiro: str = None) -> str:
-    """
-    Recebe o crop de UMA pessoa.
-    Se verificar_primeiro for dado, faz verificação binária rápida e barata.
-    Caso contrário faz reconhecimento completo contra TODAS as pessoas
-    registadas no Firestore (não só uma pessoa fixa).
-    """
     conteudo = []
 
     # ── Verificação rápida: "ainda é a mesma pessoa?" ──
@@ -228,10 +205,9 @@ def reconhecer_pessoa_crop(crop_b64: str, verificar_primeiro: str = None) -> str
             conteudo.append({"type": "image_url", "image_url": {"url": url, "detail": "high"}})
         try:
             r = client.chat.completions.create(
-                model="gpt-5.4",
+                model="gpt-4o",           # ✅ corrigido: era gpt-5.4
                 messages=[{"role": "user", "content": conteudo}],
-                max_completion_tokens=16,
-                reasoning_effort="none",  # resposta binária simples — não precisa de "pensar"
+                max_tokens=16,
             )
             resp = r.choices[0].message.content.strip().lower()
             print(f"👁️  [RÁPIDO] Ainda é '{verificar_primeiro}'? → {resp}")
@@ -240,13 +216,13 @@ def reconhecer_pessoa_crop(crop_b64: str, verificar_primeiro: str = None) -> str
         except Exception as e:
             print(f"⚠️  Verificação rápida falhou: {e}")
 
-    # ── Reconhecimento completo: contra TODAS as pessoas conhecidas ──
+    # ── Reconhecimento completo ──
     nomes_conhecidos = obter_nomes_conhecidos()
     if not nomes_conhecidos:
         return "Desconhecido"
 
-    conteudo     = []
-    lista_nomes  = " | ".join(nomes_conhecidos)
+    conteudo    = []
+    lista_nomes = " | ".join(nomes_conhecidos)
     prompt_full = (
         "És um sistema biométrico de alta precisão.\n"
         "Analisa APENAS o rosto da pessoa nesta imagem recortada.\n"
@@ -262,7 +238,6 @@ def reconhecer_pessoa_crop(crop_b64: str, verificar_primeiro: str = None) -> str
         "url": f"data:image/jpeg;base64,{crop_b64}", "detail": "high"
     }})
 
-    # Envia as fotos de referência de TODAS as pessoas, não só de uma
     for nome_ref in nomes_conhecidos:
         urls = buscar_urls_fotos(nome_ref.lower())
         for i, url in enumerate(urls):
@@ -271,10 +246,9 @@ def reconhecer_pessoa_crop(crop_b64: str, verificar_primeiro: str = None) -> str
 
     try:
         r = client.chat.completions.create(
-            model="gpt-5.4",
+            model="gpt-4o",               # ✅ corrigido: era gpt-5.4
             messages=[{"role": "user", "content": conteudo}],
-            max_completion_tokens=50,
-            reasoning_effort="none",  # só precisa de devolver um nome — raciocínio extra só consumia o budget
+            max_tokens=50,
         )
         nome    = r.choices[0].message.content.strip()
         print(f"👁️  [COMPLETO] → '{nome}'")
@@ -289,23 +263,17 @@ def reconhecer_pessoa_crop(crop_b64: str, verificar_primeiro: str = None) -> str
 # 🧠  MOTOR DE IDENTIDADE COM MEMÓRIA
 # ==========================================
 def identificar_com_memoria(img: Image.Image, detections: list) -> str:
-    """
-    Foca na pessoa principal da cena.
-    Usa cache de identidade para não chamar o GPT-4o em cada frame.
-    """
     global IDENTITY_MEMORY
 
     now = time.time()
     total_pessoas = sum(1 for d in detections if d["label"] == "person")
 
-    # Banca: 4+ pessoas
     if total_pessoas >= 4:
         return "Banca / Audiência"
 
     pessoa_principal = selecionar_pessoa_principal(detections, *img.size)
 
     if pessoa_principal is None:
-        # Ninguém visível — limpa memórias expiradas
         IDENTITY_MEMORY = {
             n: d for n, d in IDENTITY_MEMORY.items()
             if now - d["last_seen"] < IDENTITY_TTL
@@ -313,11 +281,10 @@ def identificar_com_memoria(img: Image.Image, detections: list) -> str:
         return "Ambiente Mapeado"
 
     bn = pessoa_principal["bbox_norm"]
-    cx = bn["x"] + bn["width"] / 2  # centro X desta pessoa
+    cx = bn["x"] + bn["width"] / 2
 
-    # ── Há memória para alguém perto desta posição? ──
     nome_em_cache = None
-    melhor_dist   = 0.3  # tolerância de posição (30% da largura)
+    melhor_dist   = 0.3
 
     for nome, dados in IDENTITY_MEMORY.items():
         dist = abs(dados.get("bbox_x_center", -1) - cx)
@@ -328,7 +295,6 @@ def identificar_com_memoria(img: Image.Image, detections: list) -> str:
     if nome_em_cache and (now - IDENTITY_MEMORY[nome_em_cache]["confirmed_at"]) < IDENTITY_TTL:
         idade = now - IDENTITY_MEMORY[nome_em_cache]["last_seen"]
 
-        # Re-verifica após RECHECK_AFTER segundos
         if idade > RECHECK_AFTER:
             print(f"🔄  Re-verificando '{nome_em_cache}'...")
             crop_b64  = crop_pessoa(img, bn)
@@ -357,7 +323,6 @@ def identificar_com_memoria(img: Image.Image, detections: list) -> str:
 
         return nome_em_cache
 
-    # ── Pessoa nova — reconhecimento completo ──
     print(f"🔍  Pessoa nova (cx={cx:.2f}), reconhecendo...")
     crop_b64  = crop_pessoa(img, bn)
     novo_nome = reconhecer_pessoa_crop(crop_b64)
@@ -420,17 +385,15 @@ def gerar_resposta(identity: str, names: list, user_text: str,
 
     HISTORICO_CONVERSA.append({"role": "user", "content": conteudo})
 
-    # Mantém contexto: system + últimas 12 mensagens
     if len(HISTORICO_CONVERSA) > 14:
         HISTORICO_CONVERSA = [HISTORICO_CONVERSA[0]] + HISTORICO_CONVERSA[-12:]
 
     try:
         r = client.chat.completions.create(
-            model="gpt-5.4",
+            model="gpt-4o",               # ✅ corrigido: era gpt-5.4
             messages=HISTORICO_CONVERSA,
-            max_completion_tokens=200,
-            reasoning_effort="none",     # é só uma frase de conversa, não precisa de "pensar muito"
-            verbosity="low",             # respostas curtas, como o SYSTEM_PROMPT já pede
+            max_tokens=200,               # ✅ corrigido: era max_completion_tokens (inválido no SDK padrão)
+            temperature=0.8,
         )
         reply = r.choices[0].message.content.strip()
         HISTORICO_CONVERSA.append({"role": "assistant", "content": reply})
@@ -457,7 +420,6 @@ def processar_frame(image_data: str, user_text: str = "",
     identity          = identificar_com_memoria(img, detections)
     ULTIMO_UTILIZADOR = identity
 
-    # Marca a identidade em cada bbox de pessoa
     for det in detections:
         if det["label"] == "person":
             det["identity"] = identity
@@ -502,6 +464,7 @@ def autonomous_loop():
             detections, summary, names = processar_yolo(results, img_w, img_h)
 
             identity = identificar_com_memoria(img, detections)
+            global ULTIMO_UTILIZADOR
             ULTIMO_UTILIZADOR = identity
 
             current_labels = set(names)
@@ -579,12 +542,7 @@ def detect():
 def enroll():
     """
     Regista uma nova amostra de rosto para uma pessoa.
-    Chamado várias vezes em sequência pelo frontend (uma por amostra
-    capturada) — cada chamada sobe UMA foto para o Firebase Storage e
-    acrescenta o URL à lista 'fotos' do documento dessa pessoa no Firestore.
-
-    Quantas mais amostras, em ângulos/luz diferentes, melhor a precisão
-    do reconhecimento completo em reconhecer_pessoa_crop.
+    Sobe uma foto para o Firebase Storage e acrescenta o URL ao Firestore.
     """
     try:
         if db is None or bucket is None:
@@ -601,7 +559,6 @@ def enroll():
         img_bytes = base64.b64decode(image_data)
         img       = Image.open(io.BytesIO(img_bytes)).convert("RGB")
 
-        # Confirma que há mesmo uma pessoa visível antes de gravar a amostra
         results = model(img)
         detections, _, _ = processar_yolo(results, *img.size)
         pessoa = selecionar_pessoa_principal(detections, *img.size)
@@ -609,11 +566,9 @@ def enroll():
         if pessoa is None:
             return jsonify({"success": False, "error": "Nenhuma pessoa detetada nesta amostra"}), 200
 
-        # Recorta a pessoa para a foto de referência ficar focada no rosto
         crop_b64   = crop_pessoa(img, pessoa["bbox_norm"])
         crop_bytes = base64.b64decode(crop_b64)
 
-        # Upload para o Firebase Storage
         ts        = int(time.time() * 1000)
         blob_path = f"referencias/{nome_doc}/{ts}.jpg"
         blob      = bucket.blob(blob_path)
@@ -621,13 +576,11 @@ def enroll():
         blob.make_public()
         url = blob.public_url
 
-        # Acrescenta o URL à lista de fotos de referência desta pessoa
         doc_ref = db.collection('1234').document(nome_doc)
         doc_ref.set({"fotos": firestore.ArrayUnion([url])}, merge=True)
 
-        # Invalida as caches locais para refletir o novo estado
         CACHE_FOTOS.pop(nome_doc, None)
-        KNOWN_NAMES_CACHE["ts"] = 0   # força reler a lista de nomes na próxima vez
+        KNOWN_NAMES_CACHE["ts"] = 0
 
         doc   = doc_ref.get()
         total = len(doc.to_dict().get("fotos", [])) if doc.exists else 1
@@ -697,6 +650,5 @@ def reset_chat():
 
 
 if __name__ == "__main__":
-    # O Render injeta a variável PORT dinamicamente, se não encontrar usa a 5001 localmente
     port = int(os.environ.get("PORT", 5001))
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)

@@ -12,71 +12,21 @@ import path from "path";
 const app = express();
 
 /* =========================
-   ⚡ CONFIG
+   ⚡ CORS + MIDDLEWARES
+   ✅ Têm de vir ANTES de todas as rotas
 ========================= */
-app.post("/api/vision-frame", async (req, res) => {
-  try {
-    const { image, prompt } = req.body;
+app.use(cors({
+  origin: [
+    "https://gtudilu77-hash.github.io",
+    "http://localhost:5173",
+    "http://localhost:3000",
+  ],
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+}));
 
-    if (!image) {
-      return res.status(400).json({ result: "Sem imagem" });
-    }
-
-    const response = await openai.chat.completions.create({
-      model: "gpt-5.4-mini",
-
-      messages: [
-        {
-          role: "system",
-          content: `
-És um sistema de visão artificial tipo JARVIS.
-
-Tens de:
-- identificar objetos
-- identificar pessoas
-- detetar perigos
-- descrever ambiente
-- gerar alertas curtos
-          `,
-        },
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: prompt || "Analisa esta cena em tempo real.",
-            },
-            {
-              type: "image_url",
-              image_url: {
-                url: `data:image/jpeg;base64,${image}`,
-              },
-            },
-          ],
-        },
-      ],
-      max_completion_tokens: 700,
-      reasoning_effort: "none", // descrição de cena em tempo real — sem raciocínio extra a consumir o budget
-    });
-
-    const text = getText(response);
-
-    // EXEMPLO de resposta estruturada
-    res.json({
-      result: text,
-
-      user: text.includes("Tudilu") ? "Tudilu" : null,
-
-      objects: [],
-      alerts: text.includes("lixo") ? ["lixo_detectado"] : [],
-    });
-
-  } catch (err) {
-    console.error("VISION ERROR:", err);
-    res.status(500).json({ result: "Erro visão" });
-  }
-});
-app.use(cors());
+// Responde preflight em todas as rotas
+app.options("*", cors());
 
 app.use(express.json({
   limit: "100mb",
@@ -109,12 +59,12 @@ const storage = multer.diskStorage({
 
     // Safari / MediaRecorder fixes
     if (!ext) {
-      if (file.mimetype.includes("webm")) ext = ".webm";
-      else if (file.mimetype.includes("mp4")) ext = ".mp4";
-      else if (file.mimetype.includes("mpeg")) ext = ".mp3";
-      else if (file.mimetype.includes("wav")) ext = ".wav";
-      else if (file.mimetype.includes("jpeg")) ext = ".jpg";
-      else if (file.mimetype.includes("png")) ext = ".png";
+      if (file.mimetype.includes("webm"))  ext = ".webm";
+      else if (file.mimetype.includes("mp4"))   ext = ".mp4";
+      else if (file.mimetype.includes("mpeg"))  ext = ".mp3";
+      else if (file.mimetype.includes("wav"))   ext = ".wav";
+      else if (file.mimetype.includes("jpeg"))  ext = ".jpg";
+      else if (file.mimetype.includes("png"))   ext = ".png";
       else ext = ".bin";
     }
 
@@ -128,7 +78,6 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-
   limits: {
     fileSize: 100 * 1024 * 1024, // 100MB
   },
@@ -147,10 +96,7 @@ const openai = new OpenAI({
 const DB_FILE = path.join(process.cwd(), "db.json");
 
 const readDB = () => {
-  if (!fs.existsSync(DB_FILE)) {
-    return {};
-  }
-
+  if (!fs.existsSync(DB_FILE)) return {};
   try {
     return JSON.parse(fs.readFileSync(DB_FILE, "utf-8"));
   } catch {
@@ -212,49 +158,30 @@ app.post("/api/chat", async (req, res) => {
     } = req.body;
 
     if (!message) {
-      return res.status(400).json({
-        reply: "Mensagem vazia",
-      });
+      return res.status(400).json({ reply: "Mensagem vazia" });
     }
 
     if (!userId) {
-      return res.status(400).json({
-        reply: "userId obrigatório",
-      });
+      return res.status(400).json({ reply: "userId obrigatório" });
     }
 
     const db = readDB();
-
     const history = (db[userId] || []).slice(-10);
 
     const systemPrompt =
-      mode === "short"
-        ? "Responde curto e objetivo."
-        : mode === "long"
-        ? "Responde detalhadamente."
-        : "Responde naturalmente.";
+      mode === "short"  ? "Responde curto e objetivo."    :
+      mode === "long"   ? "Responde detalhadamente."      :
+                          "Responde naturalmente.";
 
     const response = await openai.chat.completions.create({
-      model: "gpt-5.4-mini",
-
+      model: "gpt-4o-mini",             // ✅ corrigido: era gpt-5.4-mini
       messages: [
-        {
-          role: "system",
-          content: systemPrompt,
-        },
-
+        { role: "system", content: systemPrompt },
         ...history,
-
-        {
-          role: "user",
-          content: message,
-        },
+        { role: "user", content: message },
       ],
-
-      max_completion_tokens: 600,
-      reasoning_effort: "none", // conversa casual, não precisa de "pensar muito"
-      // nota: "temperature" foi removido — modelos de raciocínio do GPT-5
-      // não o suportam em /chat/completions (a chamada falhava com erro)
+      max_tokens: 600,                  // ✅ corrigido: era max_completion_tokens
+      temperature: 0.7,
     });
 
     const reply = getText(response);
@@ -271,10 +198,7 @@ app.post("/api/chat", async (req, res) => {
 
   } catch (err) {
     console.error("ERRO CHAT:", err);
-
-    res.status(500).json({
-      reply: "Erro no chat",
-    });
+    res.status(500).json({ reply: "Erro no chat" });
   }
 });
 
@@ -286,53 +210,34 @@ app.post("/api/transcribe", upload.single("audio"), async (req, res) => {
 
   try {
     if (!req.file) {
-      return res.status(400).json({
-        text: "",
-      });
+      return res.status(400).json({ text: "" });
     }
 
-    console.log("🎤 AUDIO RECEBIDO:");
-    console.log(req.file);
+    console.log("🎤 AUDIO RECEBIDO:", req.file);
 
     const inputPath = req.file.path;
-
     outputPath = `${inputPath}.wav`;
 
-    // Conversão otimizada
     execSync(
       `ffmpeg -y -i "${inputPath}" -ar 16000 -ac 1 -c:a pcm_s16le "${outputPath}"`
     );
 
     console.log("✅ ÁUDIO CONVERTIDO:", outputPath);
 
-    // Nota: modelo de áudio (transcrição) — família separada da linha
-    // GPT-5 de raciocínio, não afetado pela troca de modelo de chat/visão.
     const transcription = await openai.audio.transcriptions.create({
       file: fs.createReadStream(outputPath),
-
-      model: "gpt-4o-mini-transcribe",
+      model: "whisper-1",               // ✅ corrigido: era gpt-4o-mini-transcribe (não existe)
     });
 
-    res.json({
-      text: transcription.text || "",
-    });
+    res.json({ text: transcription.text || "" });
 
   } catch (err) {
     console.error("❌ ERRO TRANSCRIÇÃO:", err);
-
-    res.status(500).json({
-      text: "",
-      error: err.message,
-    });
+    res.status(500).json({ text: "", error: err.message });
 
   } finally {
-    if (req.file?.path) {
-      deleteFile(req.file.path);
-    }
-
-    if (outputPath) {
-      deleteFile(outputPath);
-    }
+    if (req.file?.path) deleteFile(req.file.path);
+    if (outputPath)      deleteFile(outputPath);
   }
 });
 
@@ -344,96 +249,59 @@ app.post("/api/analyze-video", upload.single("video"), async (req, res) => {
 
   try {
     if (!req.file) {
-      return res.status(400).json({
-        result: "Sem vídeo",
-      });
+      return res.status(400).json({ result: "Sem vídeo" });
     }
 
-    framesDir = path.join(
-      uploadDir,
-      `frames_${Date.now()}`
-    );
-
+    framesDir = path.join(uploadDir, `frames_${Date.now()}`);
     fs.mkdirSync(framesDir);
 
     console.log("🎥 PROCESSANDO VÍDEO...");
 
-    // Extrai frames
     execSync(
       `ffmpeg -y -i "${req.file.path}" -vf "fps=1,scale=640:-1" -t 10 "${framesDir}/frame_%03d.jpg"`
     );
 
-    const frameFiles = fs
-      .readdirSync(framesDir)
-      .sort();
+    const frameFiles = fs.readdirSync(framesDir).sort();
 
     if (!frameFiles.length) {
-      return res.status(400).json({
-        result: "Nenhum frame encontrado",
-      });
+      return res.status(400).json({ result: "Nenhum frame encontrado" });
     }
 
     const content = [
       {
         type: "text",
-        text:
-          "Estes frames pertencem a um vídeo. Analisa detalhadamente o que acontece.",
+        text: "Estes frames pertencem a um vídeo. Analisa detalhadamente o que acontece.",
       },
     ];
 
     for (const file of frameFiles) {
-      const base64 = fs.readFileSync(
-        path.join(framesDir, file),
-        "base64"
-      );
-
+      const base64 = fs.readFileSync(path.join(framesDir, file), "base64");
       content.push({
         type: "image_url",
-
-        image_url: {
-          url: `data:image/jpeg;base64,${base64}`,
-        },
+        image_url: { url: `data:image/jpeg;base64,${base64}` },
       });
     }
 
     const response = await openai.chat.completions.create({
-      model: "gpt-5.4-mini",
-
-      messages: [
-        {
-          role: "user",
-          content,
-        },
-      ],
-
-      max_completion_tokens: 1000,
-      reasoning_effort: "none", // várias imagens já é tarefa pesada em tokens — sem raciocínio extra a consumir o budget
+      model: "gpt-4o",                  // ✅ corrigido: era gpt-5.4-mini
+      messages: [{ role: "user", content }],
+      max_tokens: 1000,                 // ✅ corrigido: era max_completion_tokens
     });
 
     const text = getText(response);
 
-    res.json({
-      result: text,
-      reply: text,
-    });
+    res.json({ result: text, reply: text });
 
   } catch (err) {
     console.error("❌ ERRO VÍDEO:", err);
-
-    res.status(500).json({
-      result: "Erro ao processar vídeo",
-    });
+    res.status(500).json({ result: "Erro ao processar vídeo" });
 
   } finally {
-    if (req.file?.path) {
-      deleteFile(req.file.path);
-    }
-
+    if (req.file?.path) deleteFile(req.file.path);
     if (framesDir && fs.existsSync(framesDir)) {
       fs.readdirSync(framesDir).forEach((file) => {
         deleteFile(path.join(framesDir, file));
       });
-
       fs.rmdirSync(framesDir);
     }
   }
@@ -445,62 +313,94 @@ app.post("/api/analyze-video", upload.single("video"), async (req, res) => {
 app.post("/api/analyze-image", upload.single("image"), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({
-        result: "Sem imagem",
-      });
+      return res.status(400).json({ result: "Sem imagem" });
     }
 
-    const base64 = fs.readFileSync(
-      req.file.path,
-      "base64"
-    );
+    const base64 = fs.readFileSync(req.file.path, "base64");
 
     const response = await openai.chat.completions.create({
-      model: "gpt-5.4-mini",
-
+      model: "gpt-4o",                  // ✅ corrigido: era gpt-5.4-mini
       messages: [
         {
           role: "user",
-
           content: [
-            {
-              type: "text",
-              text: "Analisa esta imagem detalhadamente.",
-            },
-
+            { type: "text", text: "Analisa esta imagem detalhadamente." },
             {
               type: "image_url",
-
-              image_url: {
-                url: `data:image/jpeg;base64,${base64}`,
-              },
+              image_url: { url: `data:image/jpeg;base64,${base64}` },
             },
           ],
         },
       ],
+      max_tokens: 800,                  // ✅ corrigido: era max_completion_tokens
+    });
 
-      max_completion_tokens: 800,
-      reasoning_effort: "none", // descrição direta de imagem — raciocínio extra só consumia o budget de tokens
+    const text = getText(response);
+
+    res.json({ result: text, reply: text });
+
+  } catch (err) {
+    console.error("❌ ERRO IMAGEM:", err);
+    res.status(500).json({ result: "Erro ao analisar imagem" });
+
+  } finally {
+    if (req.file?.path) deleteFile(req.file.path);
+  }
+});
+
+/* =========================
+   👁️ VISION FRAME (JARVIS)
+========================= */
+app.post("/api/vision-frame", async (req, res) => {
+  try {
+    const { image, prompt } = req.body;
+
+    if (!image) {
+      return res.status(400).json({ result: "Sem imagem" });
+    }
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",                  // ✅ corrigido: era gpt-5.4-mini
+      messages: [
+        {
+          role: "system",
+          content: `
+És um sistema de visão artificial tipo JARVIS.
+
+Tens de:
+- identificar objetos
+- identificar pessoas
+- detetar perigos
+- descrever ambiente
+- gerar alertas curtos
+          `,
+        },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: prompt || "Analisa esta cena em tempo real." },
+            {
+              type: "image_url",
+              image_url: { url: `data:image/jpeg;base64,${image}` },
+            },
+          ],
+        },
+      ],
+      max_tokens: 700,                  // ✅ corrigido: era max_completion_tokens
     });
 
     const text = getText(response);
 
     res.json({
       result: text,
-      reply: text,
+      user: text.includes("Tudilu") ? "Tudilu" : null,
+      objects: [],
+      alerts: text.includes("lixo") ? ["lixo_detectado"] : [],
     });
 
   } catch (err) {
-    console.error("❌ ERRO IMAGEM:", err);
-
-    res.status(500).json({
-      result: "Erro ao analisar imagem",
-    });
-
-  } finally {
-    if (req.file?.path) {
-      deleteFile(req.file.path);
-    }
+    console.error("VISION ERROR:", err);
+    res.status(500).json({ result: "Erro visão" });
   }
 });
 
@@ -511,30 +411,21 @@ app.post("/api/tts", async (req, res) => {
   try {
     const { text } = req.body;
 
-    if (!text) {
-      return res.status(400).send("");
-    }
+    if (!text) return res.status(400).send("");
 
-    // Nota: modelo de voz — família separada, não afetada pela troca acima.
     const speech = await openai.audio.speech.create({
       model: "tts-1",
-
       voice: "alloy",
-
       input: text,
     });
 
-    const buffer = Buffer.from(
-      await speech.arrayBuffer()
-    );
+    const buffer = Buffer.from(await speech.arrayBuffer());
 
     res.setHeader("Content-Type", "audio/mpeg");
-
     res.send(buffer);
 
   } catch (err) {
     console.error("❌ ERRO TTS:", err);
-
     res.status(500).send("");
   }
 });
