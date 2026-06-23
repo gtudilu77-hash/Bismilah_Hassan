@@ -3,7 +3,7 @@ from flask_cors import CORS
 from ultralytics import YOLO
 from PIL import Image
 from openai import OpenAI
-import io, os, base64, time, threading
+import io, os, base64, time, threading, gc
 from collections import Counter
 import firebase_admin
 from firebase_admin import credentials, firestore, storage
@@ -45,10 +45,20 @@ if firebase_json:
 else:
     print("❌  FIREBASE_CREDENTIALS não encontrado!")
 
-# ── YOLO ──────────────────────────────────────────────────────────────────────
-MODEL_PATH = "../yolov8n.pt"
-model = YOLO(MODEL_PATH if os.path.exists(MODEL_PATH) else "yolov8n.pt")
-print("✅  Sensores YOLO prontos!")
+# ── YOLO — ESTRATÉGIA 1: Lazy loading ────────────────────────────────────────
+# O modelo NÃO é carregado ao arrancar o servidor.
+# É carregado apenas na primeira requisição que precisar dele.
+# Isto evita OOM durante o boot no Railway/Render.
+_yolo_model = None
+
+def get_model():
+    global _yolo_model
+    if _yolo_model is None:
+        print("🔄  [YOLO] Carregando modelo pela primeira vez...")
+        model_path = "../yolov8n.pt"
+        _yolo_model = YOLO(model_path if os.path.exists(model_path) else "yolov8n.pt")
+        print("✅  [YOLO] Modelo pronto!")
+    return _yolo_model
 
 # ── Config ────────────────────────────────────────────────────────────────────
 CONFIANCA_MINIMA = 0.45
@@ -119,6 +129,7 @@ def obter_nomes_conhecidos() -> list:
 # ==========================================
 def processar_yolo(results, img_w: int, img_h: int):
     detections, names = [], []
+    model = get_model()  # referência local para aceder a model.names
     for r in results:
         for box in r.boxes:
             conf = round(float(box.conf[0]), 4)
@@ -138,7 +149,12 @@ def processar_yolo(results, img_w: int, img_h: int):
                 "bbox_px": {"x1": int(x1), "y1": int(y1), "x2": int(x2), "y2": int(y2)},
             })
             names.append(label)
+
     summary = [{"label": k, "count": v} for k, v in Counter(names).most_common()]
+
+    # ✅ ESTRATÉGIA 3: Liberta memória após cada inferência YOLO
+    gc.collect()
+
     return detections, summary, names
 
 
@@ -205,7 +221,7 @@ def reconhecer_pessoa_crop(crop_b64: str, verificar_primeiro: str = None) -> str
             conteudo.append({"type": "image_url", "image_url": {"url": url, "detail": "high"}})
         try:
             r = client.chat.completions.create(
-                model="gpt-4o",           # ✅ corrigido: era gpt-5.4
+                model="gpt-4o",
                 messages=[{"role": "user", "content": conteudo}],
                 max_tokens=16,
             )
@@ -246,7 +262,7 @@ def reconhecer_pessoa_crop(crop_b64: str, verificar_primeiro: str = None) -> str
 
     try:
         r = client.chat.completions.create(
-            model="gpt-4o",               # ✅ corrigido: era gpt-5.4
+            model="gpt-4o",
             messages=[{"role": "user", "content": conteudo}],
             max_tokens=50,
         )
@@ -390,9 +406,9 @@ def gerar_resposta(identity: str, names: list, user_text: str,
 
     try:
         r = client.chat.completions.create(
-            model="gpt-4o",               # ✅ corrigido: era gpt-5.4
+            model="gpt-4o",
             messages=HISTORICO_CONVERSA,
-            max_tokens=200,               # ✅ corrigido: era max_completion_tokens (inválido no SDK padrão)
+            max_tokens=200,
             temperature=0.8,
         )
         reply = r.choices[0].message.content.strip()
@@ -414,7 +430,8 @@ def processar_frame(image_data: str, user_text: str = "",
     img          = Image.open(io.BytesIO(img_bytes)).convert("RGB")
     img_w, img_h = img.size
 
-    results = model(img)
+    # ✅ Usa get_model() em vez de model global
+    results = get_model()(img)
     detections, summary, names = processar_yolo(results, img_w, img_h)
 
     identity          = identificar_com_memoria(img, detections)
@@ -427,6 +444,10 @@ def processar_frame(image_data: str, user_text: str = "",
             det["identity"] = None
 
     reply = gerar_resposta(identity, names, user_text, proactive_context)
+
+    # ✅ ESTRATÉGIA 3: Liberta referências ao frame processado
+    del img, img_bytes, results
+    gc.collect()
 
     return {
         "detections": {"count": len(detections), "summary": summary, "objects": detections},
@@ -460,7 +481,9 @@ def autonomous_loop():
             img_bytes    = base64.b64decode(frame)
             img          = Image.open(io.BytesIO(img_bytes)).convert("RGB")
             img_w, img_h = img.size
-            results = model(img)
+
+            # ✅ Usa get_model() em vez de model global
+            results = get_model()(img)
             detections, summary, names = processar_yolo(results, img_w, img_h)
 
             identity = identificar_com_memoria(img, detections)
@@ -502,6 +525,11 @@ def autonomous_loop():
                 "identity": identity, "labels": current_labels,
                 "count": current_count, "ts": now
             }
+
+            # ✅ ESTRATÉGIA 3: Liberta memória do frame autónomo
+            del img, img_bytes, results
+            gc.collect()
+
         except Exception as e:
             print(f"⚠️  [AUTÓNOMO] Erro: {e}")
 
@@ -559,7 +587,8 @@ def enroll():
         img_bytes = base64.b64decode(image_data)
         img       = Image.open(io.BytesIO(img_bytes)).convert("RGB")
 
-        results = model(img)
+        # ✅ Usa get_model()
+        results = get_model()(img)
         detections, _, _ = processar_yolo(results, *img.size)
         pessoa = selecionar_pessoa_principal(detections, *img.size)
 
@@ -568,6 +597,10 @@ def enroll():
 
         crop_b64   = crop_pessoa(img, pessoa["bbox_norm"])
         crop_bytes = base64.b64decode(crop_b64)
+
+        # ✅ Liberta memória do frame de enroll
+        del img, img_bytes, results
+        gc.collect()
 
         ts        = int(time.time() * 1000)
         blob_path = f"referencias/{nome_doc}/{ts}.jpg"
@@ -645,6 +678,7 @@ def reset_chat():
     CACHE_FOTOS             = {}
     IDENTITY_MEMORY         = {}
     PREV_SCENE = {"identity": None, "labels": set(), "count": 0, "ts": 0}
+    gc.collect()
     print("🧠  [RESET] Memória limpa!")
     return jsonify({"success": True, "message": "Memória limpa! Pronto."})
 
