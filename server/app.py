@@ -273,8 +273,8 @@ def reconhecer_pessoa_crop(crop_b64: str, verificar_primeiro: str = None) -> str
         r = client.chat.completions.create(
             model="gpt-5.4",
             messages=[{"role": "user", "content": conteudo}],
-            max_completion_tokens=20,
-            reasoning_effort="low",  # compara várias fotos — um pouco de "pensar" ajuda na precisão
+            max_completion_tokens=50,
+            reasoning_effort="none",  # só precisa de devolver um nome — raciocínio extra só consumia o budget
         )
         nome    = r.choices[0].message.content.strip()
         print(f"👁️  [COMPLETO] → '{nome}'")
@@ -424,7 +424,6 @@ def gerar_resposta(identity: str, names: list, user_text: str,
     if len(HISTORICO_CONVERSA) > 14:
         HISTORICO_CONVERSA = [HISTORICO_CONVERSA[0]] + HISTORICO_CONVERSA[-12:]
 
-    try:
     try:
         r = client.chat.completions.create(
             model="gpt-5.4",

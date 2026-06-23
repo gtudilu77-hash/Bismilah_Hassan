@@ -55,8 +55,8 @@ Tens de:
           ],
         },
       ],
-      max_completion_tokens: 500,
-      reasoning_effort: "low", // descrição de cena em tempo real — rápido chega
+      max_completion_tokens: 700,
+      reasoning_effort: "none", // descrição de cena em tempo real — sem raciocínio extra a consumir o budget
     });
 
     const text = getText(response);
@@ -164,10 +164,14 @@ const saveDB = (data) => {
 
 const getText = (res) => {
   try {
-    return (
-      res?.choices?.[0]?.message?.content ||
-      "Sem resposta"
-    );
+    const content = res?.choices?.[0]?.message?.content;
+    if (!content) {
+      console.warn(
+        "⚠️  Resposta vazia — finish_reason:", res?.choices?.[0]?.finish_reason,
+        "| usage:", JSON.stringify(res?.usage)
+      );
+    }
+    return content || "Sem resposta";
   } catch {
     return "Erro ao processar resposta";
   }
@@ -402,8 +406,8 @@ app.post("/api/analyze-video", upload.single("video"), async (req, res) => {
         },
       ],
 
-      max_completion_tokens: 700,
-      reasoning_effort: "low", // várias imagens em sequência — vale um pouco mais de "pensar"
+      max_completion_tokens: 1000,
+      reasoning_effort: "none", // várias imagens já é tarefa pesada em tokens — sem raciocínio extra a consumir o budget
     });
 
     const text = getText(response);
@@ -475,8 +479,8 @@ app.post("/api/analyze-image", upload.single("image"), async (req, res) => {
         },
       ],
 
-      max_completion_tokens: 500,
-      reasoning_effort: "low",
+      max_completion_tokens: 800,
+      reasoning_effort: "none", // descrição direta de imagem — raciocínio extra só consumia o budget de tokens
     });
 
     const text = getText(response);
