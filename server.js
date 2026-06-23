@@ -248,7 +248,7 @@ app.post("/api/chat", async (req, res) => {
       ],
 
       max_completion_tokens: 600,
-      reasoning_effort: "minimal", // conversa casual, não precisa de "pensar muito"
+      reasoning_effort: "none", // conversa casual, não precisa de "pensar muito"
       // nota: "temperature" foi removido — modelos de raciocínio do GPT-5
       // não o suportam em /chat/completions (a chamada falhava com erro)
     });

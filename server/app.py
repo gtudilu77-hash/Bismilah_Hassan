@@ -231,7 +231,7 @@ def reconhecer_pessoa_crop(crop_b64: str, verificar_primeiro: str = None) -> str
                 model="gpt-5.4",
                 messages=[{"role": "user", "content": conteudo}],
                 max_completion_tokens=16,
-                reasoning_effort="minimal",  # resposta binária simples — não precisa de "pensar"
+                reasoning_effort="none",  # resposta binária simples — não precisa de "pensar"
             )
             resp = r.choices[0].message.content.strip().lower()
             print(f"👁️  [RÁPIDO] Ainda é '{verificar_primeiro}'? → {resp}")
@@ -430,7 +430,7 @@ def gerar_resposta(identity: str, names: list, user_text: str,
             model="gpt-5.4",
             messages=HISTORICO_CONVERSA,
             max_completion_tokens=200,
-            reasoning_effort="minimal",  # é só uma frase de conversa, não precisa de "pensar muito"
+            reasoning_effort="none",     # é só uma frase de conversa, não precisa de "pensar muito"
             verbosity="low",             # respostas curtas, como o SYSTEM_PROMPT já pede
         )
         reply = r.choices[0].message.content.strip()
