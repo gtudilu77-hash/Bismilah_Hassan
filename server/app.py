@@ -6,7 +6,7 @@ from openai import OpenAI
 import io, os, base64, time, threading
 from collections import Counter
 import firebase_admin
-from firebase_admin import credentials, firestore
+from firebase_admin import credentials, firestore, storage
 from dotenv import load_dotenv
 
 # ==========================================
@@ -26,14 +26,21 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 # ── Firebase ──────────────────────────────────────────────────────────────────
-db = None
+db     = None
+bucket = None  # Storage bucket — usado para guardar as fotos de referência
 import json
 firebase_json = os.getenv("FIREBASE_CREDENTIALS")
 if firebase_json:
-    cred = credentials.Certificate(json.loads(firebase_json))
-    firebase_admin.initialize_app(cred)
-    db = firestore.client()
-    print("☁️  [FIREBASE] Ligado!")
+    cred_dict = json.loads(firebase_json)
+    cred = credentials.Certificate(cred_dict)
+
+    # Permite definir o bucket explicitamente; senão deriva do project_id
+    storage_bucket = os.getenv("FIREBASE_STORAGE_BUCKET") or f"{cred_dict.get('project_id')}.appspot.com"
+
+    firebase_admin.initialize_app(cred, {"storageBucket": storage_bucket})
+    db     = firestore.client()
+    bucket = storage.bucket()
+    print(f"☁️  [FIREBASE] Ligado! Storage: {storage_bucket}")
 else:
     print("❌  firebase-credentials.json não encontrado!")
 
@@ -47,11 +54,13 @@ CONFIANCA_MINIMA   = 0.45
 IDENTITY_TTL       = 90    # segundos até expirar a memória de identidade
 RECHECK_AFTER      = 25    # re-verifica identidade após N segundos
 MISS_THRESHOLD     = 3     # scans sem confirmar antes de apagar memória
+KNOWN_NAMES_TTL     = 300   # segundos até re-listar nomes conhecidos no Firestore
 
 # ── Estado global ─────────────────────────────────────────────────────────────
 HISTORICO_CONVERSA      = []
 ULTIMO_UTILIZADOR       = "Ambiente Mapeado"
 CACHE_FOTOS             = {}
+KNOWN_NAMES_CACHE       = {"names": [], "ts": 0}
 
 # Memória de identidades: { nome: { confirmed_at, last_seen, bbox_x_center, miss_count } }
 IDENTITY_MEMORY: dict = {}
@@ -82,6 +91,30 @@ def buscar_urls_fotos(nome: str) -> list:
     except Exception as e:
         print(f"⚠️  Firebase erro: {e}")
     return []
+
+
+def obter_nomes_conhecidos() -> list:
+    """
+    Lista todas as pessoas registadas no Firestore (cada documento da
+    coleção '1234' é uma pessoa). Substitui a lista hardcoded de nomes —
+    assim, registar alguém novo pelo /enroll passa automaticamente a
+    fazer parte do reconhecimento, sem alterar código.
+    """
+    now = time.time()
+    if KNOWN_NAMES_CACHE["names"] and (now - KNOWN_NAMES_CACHE["ts"] < KNOWN_NAMES_TTL):
+        return KNOWN_NAMES_CACHE["names"]
+    if db is None:
+        return KNOWN_NAMES_CACHE["names"]
+    try:
+        docs  = db.collection('1234').stream()
+        nomes = [d.id.capitalize() for d in docs]
+        if nomes:
+            KNOWN_NAMES_CACHE["names"] = nomes
+            KNOWN_NAMES_CACHE["ts"]    = now
+        return nomes or KNOWN_NAMES_CACHE["names"]
+    except Exception as e:
+        print(f"⚠️  Firebase erro ao listar nomes conhecidos: {e}")
+        return KNOWN_NAMES_CACHE["names"]
 
 
 # ==========================================
@@ -117,7 +150,7 @@ def processar_yolo(results, img_w: int, img_h: int):
 # ==========================================
 def selecionar_pessoa_principal(detections: list, img_w: int, img_h: int) -> dict | None:
     """
-    Entre todas as 'person' detetadas, escolhe a mais provável de ser o Tudilu:
+    Entre todas as 'person' detetadas, escolhe a mais provável de ser o utilizador:
     - Prioridade 1: pessoa mais próxima do centro horizontal da imagem
     - Prioridade 2: maior área de bbox (mais perto da câmara)
     Retorna o dict de deteção ou None.
@@ -174,11 +207,12 @@ def reconhecer_pessoa_crop(crop_b64: str, verificar_primeiro: str = None) -> str
     """
     Recebe o crop de UMA pessoa.
     Se verificar_primeiro for dado, faz verificação binária rápida e barata.
-    Caso contrário faz reconhecimento completo.
+    Caso contrário faz reconhecimento completo contra TODAS as pessoas
+    registadas no Firestore (não só uma pessoa fixa).
     """
     conteudo = []
 
-    # ── Verificação rápida: "ainda é o Tudilu?" ──
+    # ── Verificação rápida: "ainda é a mesma pessoa?" ──
     if verificar_primeiro:
         prompt = (
             f"Esta imagem é do {verificar_primeiro}? "
@@ -194,9 +228,10 @@ def reconhecer_pessoa_crop(crop_b64: str, verificar_primeiro: str = None) -> str
             conteudo.append({"type": "image_url", "image_url": {"url": url, "detail": "high"}})
         try:
             r = client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-5.4",
                 messages=[{"role": "user", "content": conteudo}],
-                max_tokens=5, temperature=0.0
+                max_completion_tokens=16,
+                reasoning_effort="minimal",  # resposta binária simples — não precisa de "pensar"
             )
             resp = r.choices[0].message.content.strip().lower()
             print(f"👁️  [RÁPIDO] Ainda é '{verificar_primeiro}'? → {resp}")
@@ -205,36 +240,45 @@ def reconhecer_pessoa_crop(crop_b64: str, verificar_primeiro: str = None) -> str
         except Exception as e:
             print(f"⚠️  Verificação rápida falhou: {e}")
 
-    # ── Reconhecimento completo ──
-    conteudo = []
+    # ── Reconhecimento completo: contra TODAS as pessoas conhecidas ──
+    nomes_conhecidos = obter_nomes_conhecidos()
+    if not nomes_conhecidos:
+        return "Desconhecido"
+
+    conteudo     = []
+    lista_nomes  = " | ".join(nomes_conhecidos)
     prompt_full = (
         "És um sistema biométrico de alta precisão.\n"
         "Analisa APENAS o rosto da pessoa nesta imagem recortada.\n"
-        "Compara com as fotos de referência [REF-TUDILU].\n\n"
+        f"Compara com as fotos de referência de cada uma destas pessoas: {lista_nomes}.\n\n"
         "CRITÉRIOS:\n"
-        "1. Semelhança facial ≥ 65% → responde 'Tudilu'\n"
-        "2. Sem rosto visível ou sem correspondência clara → responde 'Desconhecido'\n\n"
-        "RESPONDE APENAS com uma palavra: Tudilu | Elijah | Kiami | Desconhecido\n"
+        "1. Semelhança facial ≥ 65% com UMA das pessoas listadas → responde o nome dela exactamente como está escrito\n"
+        "2. Sem rosto visível ou sem correspondência clara com nenhuma → responde 'Desconhecido'\n\n"
+        f"RESPONDE APENAS com uma palavra: {lista_nomes} | Desconhecido\n"
         "ZERO texto extra, ZERO explicação."
     )
     conteudo.append({"type": "text", "text": prompt_full})
     conteudo.append({"type": "image_url", "image_url": {
         "url": f"data:image/jpeg;base64,{crop_b64}", "detail": "high"
     }})
-    for nome_ref in ["tudilu"]:
-        for i, url in enumerate(buscar_urls_fotos(nome_ref)):
+
+    # Envia as fotos de referência de TODAS as pessoas, não só de uma
+    for nome_ref in nomes_conhecidos:
+        urls = buscar_urls_fotos(nome_ref.lower())
+        for i, url in enumerate(urls):
             conteudo.append({"type": "text", "text": f"[REF-{nome_ref.upper()}] Foto {i+1}:"})
             conteudo.append({"type": "image_url", "image_url": {"url": url, "detail": "high"}})
 
     try:
         r = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-5.4",
             messages=[{"role": "user", "content": conteudo}],
-            max_tokens=10, temperature=0.0
+            max_completion_tokens=20,
+            reasoning_effort="low",  # compara várias fotos — um pouco de "pensar" ajuda na precisão
         )
-        nome = r.choices[0].message.content.strip()
+        nome    = r.choices[0].message.content.strip()
         print(f"👁️  [COMPLETO] → '{nome}'")
-        validos = ["Tudilu", "Elijah", "Kiami", "Desconhecido"]
+        validos = nomes_conhecidos + ["Desconhecido"]
         return nome if nome in validos else "Desconhecido"
     except Exception as e:
         print(f"⚠️  Reconhecimento completo falhou: {e}")
@@ -381,13 +425,13 @@ def gerar_resposta(identity: str, names: list, user_text: str,
         HISTORICO_CONVERSA = [HISTORICO_CONVERSA[0]] + HISTORICO_CONVERSA[-12:]
 
     try:
+    try:
         r = client.chat.completions.create(
-            model="gpt-4o",          # gpt-4o para respostas mais naturais
+            model="gpt-5.4",
             messages=HISTORICO_CONVERSA,
-            max_tokens=150,
-            temperature=0.85,        # um pouco mais de criatividade para naturalidade
-            presence_penalty=0.6,    # evita repetir as mesmas frases
-            frequency_penalty=0.4,
+            max_completion_tokens=200,
+            reasoning_effort="minimal",  # é só uma frase de conversa, não precisa de "pensar muito"
+            verbosity="low",             # respostas curtas, como o SYSTEM_PROMPT já pede
         )
         reply = r.choices[0].message.content.strip()
         HISTORICO_CONVERSA.append({"role": "assistant", "content": reply})
@@ -506,6 +550,15 @@ def autonomous_loop():
 # 📡  ROTAS
 # ==========================================
 
+@app.route("/", methods=["GET"])
+def root():
+    return jsonify({
+        "status": "ONLINE",
+        "service": "A.V.E.S_OS — vision backend",
+        "autonomous": AUTONOMOUS_MODE,
+    })
+
+
 @app.route("/detect", methods=["POST"])
 def detect():
     global LAST_AUTONOMOUS_FRAME
@@ -520,6 +573,71 @@ def detect():
         return jsonify({"success": True, **result})
     except Exception as e:
         print(f"❌  /detect: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/enroll", methods=["POST"])
+def enroll():
+    """
+    Regista uma nova amostra de rosto para uma pessoa.
+    Chamado várias vezes em sequência pelo frontend (uma por amostra
+    capturada) — cada chamada sobe UMA foto para o Firebase Storage e
+    acrescenta o URL à lista 'fotos' do documento dessa pessoa no Firestore.
+
+    Quantas mais amostras, em ângulos/luz diferentes, melhor a precisão
+    do reconhecimento completo em reconhecer_pessoa_crop.
+    """
+    try:
+        if db is None or bucket is None:
+            return jsonify({"success": False, "error": "Firebase não está configurado no servidor"}), 500
+
+        data       = request.get_json()
+        nome       = (data.get("name") or "").strip()
+        image_data = data.get("image")
+
+        if not nome or not image_data:
+            return jsonify({"success": False, "error": "name e image são obrigatórios"}), 400
+
+        nome_doc  = nome.lower()
+        img_bytes = base64.b64decode(image_data)
+        img       = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+
+        # Confirma que há mesmo uma pessoa visível antes de gravar a amostra
+        results = model(img)
+        detections, _, _ = processar_yolo(results, *img.size)
+        pessoa = selecionar_pessoa_principal(detections, *img.size)
+
+        if pessoa is None:
+            return jsonify({"success": False, "error": "Nenhuma pessoa detetada nesta amostra"}), 200
+
+        # Recorta a pessoa para a foto de referência ficar focada no rosto
+        crop_b64   = crop_pessoa(img, pessoa["bbox_norm"])
+        crop_bytes = base64.b64decode(crop_b64)
+
+        # Upload para o Firebase Storage
+        ts        = int(time.time() * 1000)
+        blob_path = f"referencias/{nome_doc}/{ts}.jpg"
+        blob      = bucket.blob(blob_path)
+        blob.upload_from_string(crop_bytes, content_type="image/jpeg")
+        blob.make_public()
+        url = blob.public_url
+
+        # Acrescenta o URL à lista de fotos de referência desta pessoa
+        doc_ref = db.collection('1234').document(nome_doc)
+        doc_ref.set({"fotos": firestore.ArrayUnion([url])}, merge=True)
+
+        # Invalida as caches locais para refletir o novo estado
+        CACHE_FOTOS.pop(nome_doc, None)
+        KNOWN_NAMES_CACHE["ts"] = 0   # força reler a lista de nomes na próxima vez
+
+        doc   = doc_ref.get()
+        total = len(doc.to_dict().get("fotos", [])) if doc.exists else 1
+
+        print(f"💾  [ENROLL] '{nome}' → {total} foto(s) de referência")
+        return jsonify({"success": True, "name": nome, "total_samples": total})
+
+    except Exception as e:
+        print(f"❌  /enroll: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 

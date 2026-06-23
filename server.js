@@ -23,7 +23,7 @@ app.post("/api/vision-frame", async (req, res) => {
     }
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-5.4-mini",
 
       messages: [
         {
@@ -55,7 +55,8 @@ Tens de:
           ],
         },
       ],
-      max_tokens: 500,
+      max_completion_tokens: 500,
+      reasoning_effort: "low", // descrição de cena em tempo real — rápido chega
     });
 
     const text = getText(response);
@@ -230,7 +231,7 @@ app.post("/api/chat", async (req, res) => {
         : "Responde naturalmente.";
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-5.4-mini",
 
       messages: [
         {
@@ -246,7 +247,10 @@ app.post("/api/chat", async (req, res) => {
         },
       ],
 
-      temperature: 0.7,
+      max_completion_tokens: 600,
+      reasoning_effort: "minimal", // conversa casual, não precisa de "pensar muito"
+      // nota: "temperature" foi removido — modelos de raciocínio do GPT-5
+      // não o suportam em /chat/completions (a chamada falhava com erro)
     });
 
     const reply = getText(response);
@@ -297,6 +301,8 @@ app.post("/api/transcribe", upload.single("audio"), async (req, res) => {
 
     console.log("✅ ÁUDIO CONVERTIDO:", outputPath);
 
+    // Nota: modelo de áudio (transcrição) — família separada da linha
+    // GPT-5 de raciocínio, não afetado pela troca de modelo de chat/visão.
     const transcription = await openai.audio.transcriptions.create({
       file: fs.createReadStream(outputPath),
 
@@ -387,7 +393,7 @@ app.post("/api/analyze-video", upload.single("video"), async (req, res) => {
     }
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-5.4-mini",
 
       messages: [
         {
@@ -396,7 +402,8 @@ app.post("/api/analyze-video", upload.single("video"), async (req, res) => {
         },
       ],
 
-      max_tokens: 700,
+      max_completion_tokens: 700,
+      reasoning_effort: "low", // várias imagens em sequência — vale um pouco mais de "pensar"
     });
 
     const text = getText(response);
@@ -445,7 +452,7 @@ app.post("/api/analyze-image", upload.single("image"), async (req, res) => {
     );
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-5.4-mini",
 
       messages: [
         {
@@ -468,7 +475,8 @@ app.post("/api/analyze-image", upload.single("image"), async (req, res) => {
         },
       ],
 
-      max_tokens: 500,
+      max_completion_tokens: 500,
+      reasoning_effort: "low",
     });
 
     const text = getText(response);
@@ -503,6 +511,7 @@ app.post("/api/tts", async (req, res) => {
       return res.status(400).send("");
     }
 
+    // Nota: modelo de voz — família separada, não afetada pela troca acima.
     const speech = await openai.audio.speech.create({
       model: "tts-1",
 
