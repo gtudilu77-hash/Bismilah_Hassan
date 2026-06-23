@@ -23,10 +23,12 @@ app.use(cors({
   ],
   methods: ["GET", "POST", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
 }));
 
-// Responde preflight em todas as rotas
-app.options("*", cors());
+// ✅ Express 5 não aceita '*' como path — usa regex
+app.options(/.*/, cors());
 
 app.use(express.json({
   limit: "100mb",
