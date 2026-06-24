@@ -33,6 +33,9 @@ const T = {
   cloud:   'rgba(16,185,129,0.22)',
 };
 
+// ── API URL ────────────────────────────────────────────────────────────────
+const API_URL = 'https://bismilah-hassan-1.onrender.com';
+
 // ── Nuvens ─────────────────────────────────────────────────────────────────
 function Clouds() {
   const clouds = [
@@ -61,16 +64,16 @@ function Clouds() {
 
 // ── Modal ──────────────────────────────────────────────────────────────────
 function TeacherModal({isOpen,onClose}:{isOpen:boolean;onClose:()=>void}) {
-  const [tab,       setTab]       = useState<'upload'|'questions'>('upload');
-  const [file,      setFile]      = useState<File|null>(null);
-  const [title,     setTitle]     = useState('');
-  const [description,setDescription]=useState('');
-  const [uploading, setUploading] = useState(false);
-  const [questions, setQuestions] = useState<string[]>([]);
-  const [loadingQ,  setLoadingQ]  = useState(false);
-  const [qTopic,    setQTopic]    = useState('');
-  const [qLevel,    setQLevel]    = useState<'básico'|'intermédio'|'avançado'>('intermédio');
-  const [copiedIdx, setCopiedIdx] = useState<number|null>(null);
+  const [tab,        setTab]        = useState<'upload'|'questions'>('upload');
+  const [file,       setFile]       = useState<File|null>(null);
+  const [title,      setTitle]      = useState('');
+  const [description,setDescription]= useState('');
+  const [uploading,  setUploading]  = useState(false);
+  const [questions,  setQuestions]  = useState<string[]>([]);
+  const [loadingQ,   setLoadingQ]   = useState(false);
+  const [qTopic,     setQTopic]     = useState('');
+  const [qLevel,     setQLevel]     = useState<'básico'|'intermédio'|'avançado'>('intermédio');
+  const [copiedIdx,  setCopiedIdx]  = useState<number|null>(null);
 
   if (!isOpen) return null;
 
@@ -95,12 +98,22 @@ function TeacherModal({isOpen,onClose}:{isOpen:boolean;onClose:()=>void}) {
     if (!qTopic.trim()) return alert('Escreve o tópico!');
     setLoadingQ(true); setQuestions([]);
     try {
-      const res  = await fetch('http://localhost:3001/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({message:`És um professor. Gera exactamente 8 perguntas sobre "${qTopic}" de nível ${qLevel}. Array JSON: ["P1?","P2?",...]. Só JSON.`,userId:auth.currentUser?.uid})});
+      // ✅ URL corrigido para produção
+      const res = await fetch(`${API_URL}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: `És um professor. Gera exactamente 8 perguntas sobre "${qTopic}" de nível ${qLevel}. Array JSON: ["P1?","P2?",...]. Só JSON.`,
+          userId: auth.currentUser?.uid || 'teacher-guest',
+        }),
+      });
       const data = await res.json();
       const parsed = JSON.parse(data.reply.replace(/```json|```/g,'').trim());
-      setQuestions(Array.isArray(parsed)?parsed:[]);
-    } catch(e){ console.error(e); alert('Erro ao gerar perguntas.'); }
+      setQuestions(Array.isArray(parsed) ? parsed : []);
+    } catch(e){
+      console.error(e);
+      alert('Erro ao gerar perguntas. O servidor pode estar a acordar — tenta de novo em 30 segundos.');
+    }
     setLoadingQ(false);
   };
 
@@ -127,8 +140,7 @@ function TeacherModal({isOpen,onClose}:{isOpen:boolean;onClose:()=>void}) {
               <div>
                 <label className="text-xs font-bold uppercase tracking-widest mb-2 block" style={{color:`${T.accent}99`}}>Título *</label>
                 <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Ex: Álgebra Linear — Cap. 3"
-                  className="w-full p-3.5 rounded-2xl bg-white/[0.04] border border-white/[0.08] focus:outline-none text-white placeholder:text-white/20 transition-all"
-                  style={{':focus':{borderColor:T.accent}} as any}/>
+                  className="w-full p-3.5 rounded-2xl bg-white/[0.04] border border-white/[0.08] focus:outline-none text-white placeholder:text-white/20 transition-all"/>
               </div>
               <div>
                 <label className="text-xs font-bold uppercase tracking-widest mb-2 block" style={{color:`${T.accent}99`}}>Descrição</label>
@@ -217,12 +229,12 @@ function TeacherModal({isOpen,onClose}:{isOpen:boolean;onClose:()=>void}) {
 }
 
 export default function TeacherDashboard() {
-  const [user,       setUser]      = useState<User|null>(null);
-  const [scrolled,   setScrolled]  = useState(false);
-  const [materias,   setMaterias]  = useState<Materia[]>([]);
-  const [isModalOpen,setIsModalOpen]=useState(false);
-  const [expandedId, setExpandedId]=useState<string|null>(null);
-  const [activeTab,  setActiveTab] = useState<'materias'|'sobre'|'contacto'>('materias');
+  const [user,        setUser]       = useState<User|null>(null);
+  const [scrolled,    setScrolled]   = useState(false);
+  const [materias,    setMaterias]   = useState<Materia[]>([]);
+  const [isModalOpen, setIsModalOpen]= useState(false);
+  const [expandedId,  setExpandedId] = useState<string|null>(null);
+  const [activeTab,   setActiveTab]  = useState<'materias'|'sobre'|'contacto'>('materias');
 
   // Contacto form
   const [form,    setForm]    = useState({name:'',email:'',subject:'',message:''});
@@ -231,6 +243,9 @@ export default function TeacherDashboard() {
   const navigate = useNavigate();
 
   useEffect(()=>{
+    // ✅ Wake-up do servidor ao abrir o dashboard
+    fetch(`${API_URL}/`).catch(()=>{});
+
     const onScroll=()=>setScrolled(window.scrollY>20);
     window.addEventListener('scroll',onScroll);
     const unsubAuth = onAuthStateChanged(auth,setUser);
@@ -533,7 +548,7 @@ export default function TeacherDashboard() {
                   <p className="text-xs font-black uppercase tracking-widest text-white/30 mb-4 flex items-center gap-2"><Globe className="w-3.5 h-3.5"/> Canais Oficiais</p>
                   <div className="flex gap-3">
                     {[Facebook,Twitter,Instagram,Linkedin].map((Icon,i)=>(
-                      <button key={i} className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-white transition-all hover:scale-110" style={{':hover':{background:T.accent}} as any}>
+                      <button key={i} className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-white transition-all hover:scale-110">
                         <Icon className="w-4 h-4"/>
                       </button>
                     ))}
