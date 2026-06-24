@@ -15,7 +15,7 @@ import {
 } from "firebase/firestore";
 
 // ─── Env ──────────────────────────────────────────────────────────────────────
-const API = import.meta.env.VITE_API_URL ?? 'http://https://bismilah-hassan-1.onrender.com';
+const API = 'https://bismilah-hassan-1.onrender.com';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Message {
