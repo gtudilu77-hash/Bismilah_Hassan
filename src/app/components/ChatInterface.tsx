@@ -184,7 +184,9 @@ function AttachButton({
 }
 
 // ─── Flashcard Panel ──────────────────────────────────────────────────────────
-function FlashcardPanel({ t, onGenerate, cards, isLoading, isMobile }: { t: any; onGenerate: () => void; cards: Flashcard[]; isLoading: boolean; isMobile?: boolean }) {
+function FlashcardPanel({ t, onGenerate, cards, isLoading, isMobile }: {
+  t: any; onGenerate: () => void; cards: Flashcard[]; isLoading: boolean; isMobile?: boolean;
+}) {
   const [idx, setIdx]   = useState(0);
   const [flip, setFlip] = useState(false);
   const [mastered, setMastered] = useState<Set<number>>(new Set());
@@ -257,22 +259,46 @@ function FlashcardPanel({ t, onGenerate, cards, isLoading, isMobile }: { t: any;
 }
 
 // ─── Quiz Panel ───────────────────────────────────────────────────────────────
-function QuizPanel({ t, onGenerate, questions, isLoading, isMobile }: { t: any; onGenerate: () => void; questions: QuizQuestion[]; isLoading: boolean; isMobile?: boolean }) {
-  const [idx, setIdx]     = useState(0);
-  const [sel, setSel]     = useState<number | null>(null);
-  const [score, setScore] = useState(0);
-  const [done, setDone]   = useState(false);
+function QuizPanel({ t, onGenerate, questions, isLoading, isMobile, onComplete }: {
+  t: any; onGenerate: () => void; questions: QuizQuestion[];
+  isLoading: boolean; isMobile?: boolean;
+  onComplete?: (score: number, total: number, wrong: string[]) => void;
+}) {
+  const [idx, setIdx]         = useState(0);
+  const [sel, setSel]         = useState<number | null>(null);
+  const [score, setScore]     = useState(0);
+  const [done, setDone]       = useState(false);
   const [answers, setAnswers] = useState<number[]>([]);
+  const [wrong, setWrong]     = useState<string[]>([]);   // ← NOVO: rastreia perguntas erradas
 
-  const reset = () => { setIdx(0); setSel(null); setScore(0); setDone(false); setAnswers([]); };
+  const reset = () => {
+    setIdx(0); setSel(null); setScore(0);
+    setDone(false); setAnswers([]); setWrong([]);          // ← limpa também wrong
+  };
+
   const confirm = () => {
     if (sel === null) return;
     const newAns = [...answers, sel];
     setAnswers(newAns);
-    if (sel === questions[idx].correct) setScore(s => s + 1);
-    if (idx + 1 >= questions.length) setDone(true);
-    else setTimeout(() => { setSel(null); setIdx(i => i + 1); }, 600);
+
+    const isCorrect = sel === questions[idx].correct;
+    const newScore  = isCorrect ? score + 1 : score;
+    if (isCorrect) setScore(s => s + 1);
+
+    // Acumula perguntas erradas com o texto da pergunta
+    const newWrong = isCorrect
+      ? wrong
+      : [...wrong, questions[idx].question];
+    setWrong(newWrong);
+
+    if (idx + 1 >= questions.length) {
+      setDone(true);
+      onComplete?.(newScore, questions.length, newWrong); // ← ENVIA resultado para o Dashboard
+    } else {
+      setTimeout(() => { setSel(null); setIdx(i => i + 1); }, 600);
+    }
   };
+
   const pct = questions.length > 0 ? Math.round((score / questions.length) * 100) : 0;
   const q   = questions[idx];
   const r   = isMobile ? 36 : 40;
@@ -358,7 +384,9 @@ function QuizPanel({ t, onGenerate, questions, isLoading, isMobile }: { t: any; 
 }
 
 // ─── Organizer Panel ──────────────────────────────────────────────────────────
-function OrganizerPanel({ t, onGenerate, topics, isLoading, isMobile }: { t: any; onGenerate: () => void; topics: Topic[]; isLoading: boolean; isMobile?: boolean }) {
+function OrganizerPanel({ t, onGenerate, topics, isLoading, isMobile }: {
+  t: any; onGenerate: () => void; topics: Topic[]; isLoading: boolean; isMobile?: boolean;
+}) {
   const [expanded, setExpanded] = useState<number | null>(0);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: isMobile ? 16 : 20, gap: isMobile ? 12 : 14 }}>
@@ -499,7 +527,6 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
   const [sidebarOpen,   setSidebarOpen]   = useState(true);
 
   const isMobile = useIsMobile(768);
-  // Em mobile, sidebar começa fechada
   useEffect(() => { if (isMobile) setSidebarOpen(false); }, [isMobile]);
 
   const messagesEndRef   = useRef<HTMLDivElement>(null);
@@ -516,12 +543,10 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
   const currentRole    = (role || navigationRole || (isTeacher ? 'professor' : 'normal')) as keyof typeof THEMES;
   const t              = THEMES[currentRole] ?? THEMES.normal;
 
-  // Auto-collapse sidebar when study panel opens (desktop only)
   useEffect(() => {
     if (sidePanel !== 'none' && !isMobile) setSidebarOpen(false);
   }, [sidePanel, isMobile]);
 
-  // Auto-resize textarea
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
@@ -591,7 +616,6 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
     const textToSend = inputValue || `Anexo: ${preview?.file.name}`;
     const cp = preview;
     setInputValue(''); setPreview(null); setIsTyping(true);
-    // Fecha sidebar mobile ao enviar
     if (isMobile) setSidebarOpen(false);
     try {
       let chatId = currentChatId;
@@ -619,7 +643,6 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Em mobile, Enter só quebra linha (não envia)
     if (e.key === 'Enter' && !e.shiftKey && !isMobile) { e.preventDefault(); handleSend(); }
   };
 
@@ -635,11 +658,13 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
     try { setFlashcards((await callAI(`Gera 6 flashcards JSON: [{"front":"...","back":"..."}]. Conversa: ${getCtx()}. Só JSON.`)).map((f: any) => ({ ...f, mastered: false }))); } catch {}
     setToolLoading('none');
   };
+
   const generateQuiz = async () => {
     setToolLoading('quiz');
     try { setQuizQuestions(await callAI(`Cria 5 perguntas JSON: [{"question":"...","options":["A","B","C","D"],"correct":0}]. Conversa: ${getCtx()}. Só JSON.`)); } catch {}
     setToolLoading('none');
   };
+
   const generateOrganizer = async () => {
     setToolLoading('organizer');
     const colors = [t.accent, '#f59e0b', '#ec4899', '#06b6d4', '#84cc16'];
@@ -647,9 +672,26 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
     setToolLoading('none');
   };
 
+  // ─── NOVO: callback chamada quando o quiz termina ─────────────────────────
+  const handleQuizComplete = useCallback((score: number, total: number, wrong: string[]) => {
+    // Extrai o tópico da última mensagem do utilizador (primeiros 40 chars)
+    const lastUserMsg = [...messages].reverse().find(m => m.sender === 'user');
+    const topic = lastUserMsg?.text?.slice(0, 40) || 'Quiz';
+
+    const result = {
+      topic,
+      score,
+      total,
+      date: new Date().toLocaleDateString('pt-PT'),
+      wrong,
+    };
+
+    // Chama a função global exposta pelo StudentDashboard
+    (window as any).registerQuizResult?.(result);
+  }, [messages]);
+
   const togglePanel = (mode: SidePanelMode) => {
     setSidePanel(p => p === mode ? 'none' : mode);
-    // Em mobile, abre o painel e fecha sidebar ao mesmo tempo
     if (isMobile) setSidebarOpen(false);
   };
 
@@ -661,23 +703,17 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
 
   const showWelcome = messages.length <= 1;
 
-  // ── Layout decisions ──
-  // Mobile: sidebar e painéis são overlays (posição fixed)
-  // Desktop: layout flex em linha (igual ao original)
   const sidebarW    = isMobile ? '80vw' : 272;
   const studyPanelW = isMobile ? '100vw' : 440;
 
-  // Overlay backdrop (mobile)
   const showBackdrop = isMobile && (sidebarOpen || sidePanel !== 'none');
 
   return (
     <div style={{ minHeight: '100vh', height: '100vh', backgroundColor: '#050208', color: '#fff', display: 'flex', overflow: 'hidden', position: 'relative', fontFamily: "'Sora','DM Sans',sans-serif" }}>
 
-      {/* BG */}
       <div style={{ position: 'fixed', inset: 0, zIndex: 0, background: t.radial, pointerEvents: 'none' }} />
       <Clouds color={t.cloudColor} />
 
-      {/* ── MOBILE BACKDROP ── */}
       {showBackdrop && (
         <div
           onClick={() => { setSidebarOpen(false); setSidePanel('none'); }}
@@ -723,7 +759,6 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
             </button>
           </div>
 
-          {/* Mascote — oculto em mobile para economizar espaço */}
           {!isMobile && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 0 20px', borderBottom: `1px solid ${t.border}` }}>
               <div style={{ padding: 16, borderRadius: 28, background: t.accentDim, border: `1px solid ${t.border}`, boxShadow: `0 0 40px ${t.accent}10` }}>
@@ -734,7 +769,6 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
             </div>
           )}
 
-          {/* Study tools */}
           <div style={{ padding: isMobile ? '12px 12px 10px' : '14px 14px 10px', borderBottom: `1px solid ${t.border}` }}>
             <p style={{ fontSize: 8, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.4em', color: `${t.accent}35`, margin: '0 0 10px 4px' }}>Estudo</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
@@ -750,7 +784,6 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
             </div>
           </div>
 
-          {/* History */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }} className="custom-scroll">
             <p style={{ fontSize: 8, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.4em', color: `${t.accent}35`, margin: '0 0 10px 4px' }}>Histórico</p>
             {chatHistories.map(chat => {
@@ -766,7 +799,6 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
         </div>
       </aside>
 
-      {/* ── SIDEBAR TOGGLE (desktop, quando collapsed) ── */}
       {!isMobile && !sidebarOpen && (
         <button
           onClick={() => setSidebarOpen(true)}
@@ -811,7 +843,6 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
       }}>
         {sidePanel !== 'none' && (
           <>
-            {/* Panel header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: isMobile ? '14px 16px' : '16px 20px', borderBottom: `1px solid ${t.border}`, flexShrink: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 {!isMobile && (
@@ -832,7 +863,6 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
               </button>
             </div>
 
-            {/* Tool tabs */}
             <div style={{ display: 'flex', gap: 0, borderBottom: `1px solid ${t.border}`, flexShrink: 0 }}>
               {TOOLS.map(({ id, icon: Icon, label }) => (
                 <button key={id} onClick={() => setSidePanel(id)} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: isMobile ? '9px 0' : '10px 0', background: 'none', border: 'none', borderBottom: `2px solid ${sidePanel === id ? t.accent : 'transparent'}`, cursor: 'pointer', color: sidePanel === id ? t.accent : 'rgba(255,255,255,0.2)', fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em', transition: 'all 0.15s ease' }}>
@@ -842,9 +872,22 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto' }} className="custom-scroll">
-              {sidePanel === 'flashcards' && <FlashcardPanel t={t} cards={flashcards} onGenerate={generateFlashcards} isLoading={toolLoading === 'flashcards'} isMobile={isMobile} />}
-              {sidePanel === 'quiz'       && <QuizPanel      t={t} questions={quizQuestions} onGenerate={generateQuiz} isLoading={toolLoading === 'quiz'} isMobile={isMobile} />}
-              {sidePanel === 'organizer'  && <OrganizerPanel t={t} topics={topics} onGenerate={generateOrganizer} isLoading={toolLoading === 'organizer'} isMobile={isMobile} />}
+              {sidePanel === 'flashcards' && (
+                <FlashcardPanel t={t} cards={flashcards} onGenerate={generateFlashcards} isLoading={toolLoading === 'flashcards'} isMobile={isMobile} />
+              )}
+              {sidePanel === 'quiz' && (
+                <QuizPanel
+                  t={t}
+                  questions={quizQuestions}
+                  onGenerate={generateQuiz}
+                  isLoading={toolLoading === 'quiz'}
+                  isMobile={isMobile}
+                  onComplete={handleQuizComplete}
+                />
+              )}
+              {sidePanel === 'organizer' && (
+                <OrganizerPanel t={t} topics={topics} onGenerate={generateOrganizer} isLoading={toolLoading === 'organizer'} isMobile={isMobile} />
+              )}
             </div>
           </>
         )}
@@ -853,7 +896,6 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
       {/* ── MAIN CHAT ── */}
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 10, height: '100vh', minWidth: 0, overflow: 'hidden' }}>
 
-        {/* ── MOBILE TOP BAR ── */}
         {isMobile && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: `1px solid ${t.border}`, background: t.sidebarBg, backdropFilter: 'blur(24px)', flexShrink: 0, zIndex: 15 }}>
             <button onClick={() => setSidebarOpen(true)} style={{ width: 36, height: 36, borderRadius: 12, border: `1px solid ${t.border}`, background: t.accentDim, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: t.accent }}>
