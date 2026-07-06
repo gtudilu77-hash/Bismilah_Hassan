@@ -73,9 +73,9 @@ export default function About() {
             </div>
 
             {/* Coluna da Mascote (Direita) */}
-            <div className="relative group shrink-0 w-full max-w-[220px] sm:max-w-[280px] md:max-w-none mx-auto">
+            <div className="relative group shrink-0 w-full max-w-[220px] sm:max-w-[280px] md:w-auto md:max-w-none mx-auto md:mx-0">
               <div className="absolute inset-0 bg-purple-600/20 blur-[80px] rounded-full group-hover:bg-purple-600/30 transition-all duration-700" />
-              <div className="relative p-6 sm:p-8 md:p-12 rounded-[2rem] sm:rounded-[3rem] bg-black/40 border border-white/10 backdrop-blur-2xl shadow-2xl transition-transform duration-500 group-hover:scale-105 group-hover:rotate-2">
+              <div className="relative flex items-center justify-center p-6 sm:p-8 md:p-12 rounded-[2rem] sm:rounded-[3rem] bg-black/40 border border-white/10 backdrop-blur-2xl shadow-2xl transition-transform duration-500 group-hover:scale-105 group-hover:rotate-2">
                 <AnimatedChickenMascot size="large" isGesturing />
               </div>
             </div>

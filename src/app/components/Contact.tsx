@@ -97,9 +97,9 @@ export function Contact() {
 
         {/* 🔥 MASCOTE - Floating Style */}
         <div className="relative z-10 flex justify-center py-6 px-4">
-          <div className="relative group w-full max-w-[220px] sm:max-w-none">
+          <div className="relative group w-full max-w-[220px] sm:w-auto sm:max-w-none">
             <div className="absolute inset-0 bg-purple-600/20 blur-[60px] rounded-full group-hover:bg-purple-600/30 transition-all duration-700" />
-            <div className="relative p-4 sm:p-6 rounded-3xl bg-white/[0.03] border border-white/10 backdrop-blur-3xl shadow-2xl transition-transform duration-500 group-hover:scale-105">
+            <div className="relative flex items-center justify-center p-4 sm:p-6 rounded-3xl bg-white/[0.03] border border-white/10 backdrop-blur-3xl shadow-2xl transition-transform duration-500 group-hover:scale-105">
               <AnimatedChickenMascot size="medium" isGesturing />
             </div>
           </div>
