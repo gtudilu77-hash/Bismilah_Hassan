@@ -1,12 +1,14 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { AnimatedChickenMascot } from './AnimatedChickenMascot';
 import {
   Send, ArrowLeft, Mic, Paperclip, Image as ImageIcon, Video,
   Volume2, VolumeX, CheckCircle2, BookOpen, Brain, ListChecks,
   ChevronRight, ChevronLeft, X, RotateCcw, Trophy, Sparkles,
   GraduationCap, Clock, Star, Plus, PanelLeftClose, PanelLeftOpen,
-  Menu, FileText, Download
+  Menu, FileText, Download, Copy, Check
 } from 'lucide-react';
 import { db, auth } from "../../firebase";
 import {
@@ -181,6 +183,68 @@ function AttachButton({
         </div>
       )}
     </div>
+  );
+}
+
+// ─── Code block (com botão de copiar) ─────────────────────────────────────────
+function CodeBlock({ t, language, value }: { t: any; language?: string; value: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    navigator.clipboard.writeText(value);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+  return (
+    <div style={{ margin: '10px 0', borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.4)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 12px', background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+        <span style={{ fontSize: 9, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.15em', color: 'rgba(255,255,255,0.3)' }}>{language || 'código'}</span>
+        <button onClick={copy} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', cursor: 'pointer', color: copied ? t.accent : 'rgba(255,255,255,0.3)', fontSize: 9, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+          {copied ? <Check size={11} /> : <Copy size={11} />} {copied ? 'Copiado' : 'Copiar'}
+        </button>
+      </div>
+      <pre style={{ margin: 0, padding: '12px 14px', overflowX: 'auto' }} className="custom-scroll">
+        <code style={{ fontFamily: "'Fira Code', 'Courier New', monospace", fontSize: 12, color: 'rgba(255,255,255,0.85)', lineHeight: 1.6, whiteSpace: 'pre' }}>{value}</code>
+      </pre>
+    </div>
+  );
+}
+
+// ─── Renderizador de Markdown para as mensagens da IA ─────────────────────────
+function MarkdownMessage({ text, t }: { text: string; t: any }) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{
+        h1: ({ ...props }) => <h1 style={{ fontSize: 18, fontWeight: 900, margin: '4px 0 10px', color: 'rgba(255,255,255,0.95)', lineHeight: 1.3 }} {...props} />,
+        h2: ({ ...props }) => <h2 style={{ fontSize: 16, fontWeight: 900, margin: '12px 0 8px', color: 'rgba(255,255,255,0.92)', lineHeight: 1.3 }} {...props} />,
+        h3: ({ ...props }) => <h3 style={{ fontSize: 14, fontWeight: 800, margin: '10px 0 6px', color: t.accent, lineHeight: 1.3 }} {...props} />,
+        p: ({ ...props }) => <p style={{ margin: '0 0 10px', lineHeight: 1.7 }} {...props} />,
+        strong: ({ ...props }) => <strong style={{ fontWeight: 800, color: 'rgba(255,255,255,0.98)' }} {...props} />,
+        em: ({ ...props }) => <em style={{ fontStyle: 'italic', color: 'rgba(255,255,255,0.75)' }} {...props} />,
+        ul: ({ ...props }) => <ul style={{ margin: '4px 0 12px', paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 5 }} {...props} />,
+        ol: ({ ...props }) => <ol style={{ margin: '4px 0 12px', paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 5 }} {...props} />,
+        li: ({ ...props }) => <li style={{ lineHeight: 1.7 }} {...props} />,
+        a: ({ ...props }) => <a style={{ color: t.accent, textDecoration: 'underline' }} target="_blank" rel="noopener noreferrer" {...props} />,
+        blockquote: ({ ...props }) => <blockquote style={{ margin: '8px 0', padding: '8px 14px', borderLeft: `3px solid ${t.accent}`, background: t.accentDim, borderRadius: 8, color: 'rgba(255,255,255,0.7)' }} {...props} />,
+        hr: () => <hr style={{ border: 'none', borderTop: `1px solid ${t.border}`, margin: '14px 0' }} />,
+        table: ({ ...props }) => <div style={{ overflowX: 'auto', margin: '10px 0' }} className="custom-scroll"><table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }} {...props} /></div>,
+        thead: ({ ...props }) => <thead style={{ borderBottom: `1px solid ${t.border}` }} {...props} />,
+        th: ({ ...props }) => <th style={{ textAlign: 'left', padding: '8px 12px', fontWeight: 900, color: t.accent, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }} {...props} />,
+        td: ({ ...props }) => <td style={{ padding: '8px 12px', borderTop: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.75)' }} {...props} />,
+        pre: ({ children }) => <>{children}</>,
+        code: ({ className, children, ...props }: any) => {
+          const isInline = !className;
+          const match = /language-(\w+)/.exec(className || '');
+          const value = String(children).replace(/\n$/, '');
+          if (isInline) {
+            return <code style={{ background: 'rgba(255,255,255,0.08)', padding: '2px 6px', borderRadius: 6, fontSize: '0.9em', fontFamily: 'monospace', color: t.accent }} {...props}>{children}</code>;
+          }
+          return <CodeBlock t={t} language={match?.[1]} value={value} />;
+        },
+      }}
+    >
+      {text}
+    </ReactMarkdown>
   );
 }
 
@@ -1028,8 +1092,8 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
                   <p style={{ fontSize: 8, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.35em', marginBottom: 5, paddingLeft: 4, paddingRight: 4, textAlign: msg.sender === 'user' ? 'right' : 'left', color: msg.sender === 'user' ? 'rgba(255,255,255,0.2)' : `${t.accent}60` }}>
                     {msg.sender === 'user' ? 'Operador' : 'A.V.E.S'}
                   </p>
-                  <div style={{ padding: isMobile ? '12px 16px' : '16px 22px', fontSize: isMobile ? 12 : 13, lineHeight: 1.7, whiteSpace: 'pre-wrap', background: msg.sender === 'user' ? t.userMsg : t.aiMsg, borderRadius: msg.sender === 'user' ? '20px 4px 20px 20px' : '4px 20px 20px 20px', border: `1px solid ${msg.sender === 'user' ? 'rgba(255,255,255,0.1)' : t.border}`, backdropFilter: 'blur(16px)', color: 'rgba(255,255,255,0.88)', wordBreak: 'break-word' }}>
-                    {msg.text}
+                  <div style={{ padding: isMobile ? '12px 16px' : '16px 22px', fontSize: isMobile ? 12 : 13, lineHeight: 1.7, whiteSpace: msg.sender === 'user' ? 'pre-wrap' : 'normal', background: msg.sender === 'user' ? t.userMsg : t.aiMsg, borderRadius: msg.sender === 'user' ? '20px 4px 20px 20px' : '4px 20px 20px 20px', border: `1px solid ${msg.sender === 'user' ? 'rgba(255,255,255,0.1)' : t.border}`, backdropFilter: 'blur(16px)', color: 'rgba(255,255,255,0.88)', wordBreak: 'break-word' }}>
+                    {msg.sender === 'ai' ? <MarkdownMessage text={msg.text} t={t} /> : msg.text}
                     {msg.file && (
                       <div style={{ marginTop: 12, borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
                         {msg.fileType === 'image' && <img src={msg.file} style={{ width: '100%', maxHeight: isMobile ? 200 : 280, objectFit: 'contain' }} />}
