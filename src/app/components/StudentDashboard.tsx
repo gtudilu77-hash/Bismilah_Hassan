@@ -14,7 +14,7 @@ import { StudentMaterialModal } from './StudentMaterialModal';
 
 interface Materia {
   id: string; titulo: string; descricao: string;
-  arquivoUrl: string; dataCriacao: any; autor: string;
+  arquivoUrl: string; dataCriacao: any; autor: string; tipo?: string;
 }
 
 interface QuizResult {
@@ -122,7 +122,7 @@ export default function StudentDashboard() {
         id: d.id, titulo: d.data().titulo || "Sem título",
         descricao: d.data().descricao || d.data().description || "Sem descrição.",
         arquivoUrl: d.data().arquivoUrl || "", dataCriacao: d.data().dataCriacao || null,
-        autor: d.data().autor || "Professor"
+        autor: d.data().autor || "Professor", tipo: d.data().tipo || d.data().type || ""
       })));
     });
     return () => { unsubAuth(); unsubFS(); window.removeEventListener('scroll', handleScroll); };
@@ -171,7 +171,23 @@ export default function StudentDashboard() {
 
   const handleLogout = async () => { try { await signOut(auth); navigate("/login"); } catch (e) { console.error(e); } };
   const openMateria = (m: Materia) => { setSelectedMateria(m); setIsModalOpen(true); };
-  const handleAskIA = (titulo: string) => navigate("/chat", { state: { role: "aluno", prompt: `Explique detalhadamente: ${titulo}` } });
+
+  // Abre o chat já com a matéria carregada no painel lateral de leitura,
+  // para o aluno poder ler o documento e perguntar à IA ao mesmo tempo
+  // (mesmo formato de leitura lateral usado pelo Claude ao abrir um artefacto).
+  const handleAskIA = (m: Materia) => navigate("/chat", {
+    state: {
+      role: "aluno",
+      prompt: `Explique detalhadamente: ${m.titulo}`,
+      materia: {
+        titulo: m.titulo,
+        descricao: m.descricao,
+        arquivoUrl: m.arquivoUrl,
+        tipo: m.tipo,
+        autor: m.autor,
+      },
+    },
+  });
 
   // Erros mais frequentes
   const allWrong = stats.recentResults.flatMap(r => r.wrong || []);
@@ -290,7 +306,7 @@ export default function StudentDashboard() {
                       <button onClick={() => openMateria(m)} className="flex-1 py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-500 transition-all font-bold text-sm shadow-[0_4px_20px_rgba(37,99,235,0.25)] hover:shadow-[0_0_25px_rgba(37,99,235,0.4)]">
                         Abrir Material
                       </button>
-                      <button onClick={() => handleAskIA(m.titulo)} className="px-4 py-3.5 rounded-2xl bg-purple-600/20 border border-purple-500/30 hover:bg-purple-600/40 transition-all">
+                      <button onClick={() => handleAskIA(m)} className="px-4 py-3.5 rounded-2xl bg-purple-600/20 border border-purple-500/30 hover:bg-purple-600/40 transition-all" title="Ler e estudar com a IA">
                         <Brain className="w-4 h-4 text-purple-400" />
                       </button>
                     </div>
@@ -428,7 +444,7 @@ export default function StudentDashboard() {
         </section>
       )}
 
-      <StudentMaterialModal materia={selectedMateria} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onAskIA={handleAskIA} />
+      <StudentMaterialModal materia={selectedMateria} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onAskIA={() => selectedMateria && handleAskIA(selectedMateria)} />
     </div>
   );
 }

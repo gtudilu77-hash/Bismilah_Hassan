@@ -19,6 +19,7 @@ import {
 
 interface Materia {
   id: string; titulo: string; descricao: string; dataCriacao: any; autor: string;
+  arquivoUrl?: string; tipo?: string;
 }
 
 // ── Tema verde ─────────────────────────────────────────────────────────────
@@ -254,6 +255,7 @@ export default function TeacherDashboard() {
       id:d.id, titulo:d.data().titulo||'Sem título',
       descricao:d.data().descricao||d.data().description||'Sem descrição.',
       dataCriacao:d.data().dataCriacao||null, autor:d.data().autor||'Professor',
+      arquivoUrl:d.data().arquivoUrl||'', tipo:d.data().tipo||'',
     }))),e=>console.error(e));
     return ()=>{ unsubAuth(); unsubFS(); window.removeEventListener('scroll',onScroll); };
   },[]);
@@ -278,6 +280,23 @@ export default function TeacherDashboard() {
     }catch(e){console.error(e);alert('Erro ao enviar.');}
     setSending(false);
   };
+
+  // Abre o chat já com a matéria carregada no painel lateral de leitura,
+  // para o professor poder ler o ficheiro e conversar com a IA ao mesmo tempo
+  // (mesmo formato de leitura lateral usado pelo Claude ao abrir um artefacto).
+  const handleAskIA = (m: Materia) => navigate('/chat', {
+    state: {
+      role: 'professor',
+      prompt: `Explique detalhadamente: ${m.titulo}`,
+      materia: {
+        titulo: m.titulo,
+        descricao: m.descricao,
+        arquivoUrl: m.arquivoUrl,
+        tipo: m.tipo,
+        autor: m.autor,
+      },
+    },
+  });
 
   const TABS=[
     {id:'materias', label:'📚 Matérias'},
@@ -418,6 +437,9 @@ export default function TeacherDashboard() {
                       <div className="flex gap-3">
                         <button onClick={()=>setIsModalOpen(true)} className="flex-1 py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5" style={{background:T.dim,border:`1px solid ${T.border}`,color:T.accent}}>
                           <Brain className="w-3.5 h-3.5"/> Gerar Perguntas
+                        </button>
+                        <button onClick={()=>handleAskIA(m)} className="py-3 px-4 rounded-xl border transition-all shrink-0" style={{background:T.dim,border:`1px solid ${T.border}`,color:T.accent}} title="Ler matéria e estudar com a IA">
+                          <BookOpen className="w-4 h-4"/>
                         </button>
                         <button onClick={()=>handleDelete(m.id,m.titulo)} className="py-3 px-4 rounded-xl border border-red-500/20 bg-red-500/5 text-red-400 hover:bg-red-500 hover:text-white transition-all shrink-0">
                           <Trash2 className="w-4 h-4"/>
