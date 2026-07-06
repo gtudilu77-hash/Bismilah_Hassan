@@ -60,19 +60,15 @@ export function AnimatedChickenMascot({
   const activeGlow = backgroundGlows[theme];
   const activeGrad = svgGradients[theme];
 
-  // Olhos estão em translate(200,150), esquerdo em (-24,-8) e direito em (24,-8)
-  // Em coordenadas absolutas: esquerdo=(176,142), direito=(224,142)
-  // Óculos centrados entre eles, ligeiramente abaixo do centro dos olhos
-  const glassY = 142;     // centro vertical dos olhos
-  const lensR  = 20;      // raio externo da lente (olho tem r=17)
-  const lensLX = 176;     // centro do olho esquerdo
-  const lensRX = 224;     // centro do olho direito
-  const bridgeY = glassY; // ponte ao nível do centro
+  const glassY = 142;
+  const lensR  = 20;
+  const lensLX = 176;
+  const lensRX = 224;
+  const bridgeY = glassY;
 
   return (
     <div className="relative animate-bounce-gentle">
 
-      {/* Multi-layer Glow */}
       <div className="absolute inset-0 blur-3xl opacity-80 transition-all duration-700">
         <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 ${activeGlow.layer1} rounded-full animate-pulse transition-all duration-700`} />
         <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 ${activeGlow.layer2} rounded-full animate-pulse transition-all duration-700`} style={{ animationDelay: '0.5s' }} />
@@ -150,7 +146,6 @@ export function AnimatedChickenMascot({
             <stop offset="100%" stopColor="#fb923c" />
           </linearGradient>
 
-          {/* ── Gradiente das hastes dos óculos ── */}
           <linearGradient id={`glassGrad-${size}`} x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%"   stopColor={activeGrad.glassStroke} stopOpacity="0.9"/>
             <stop offset="100%" stopColor={activeGrad.glassShine}  stopOpacity="0.6"/>
@@ -164,7 +159,6 @@ export function AnimatedChickenMascot({
             <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
             <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
           </filter>
-          {/* Glow suave para os óculos */}
           <filter id={`glassGlow-${size}`}>
             <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
             <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
@@ -220,7 +214,6 @@ export function AnimatedChickenMascot({
           <circle cx="-18" cy="-22" r="28"
             fill={`url(#headShineGradient-${size})`} opacity="0.7"/>
 
-          {/* Comb */}
           <g transform="translate(0, -62)" filter={`url(#strongGlowChicken-${size})`}>
             <path d="M -20 0 Q -20 -18 -12 -25 Q -10 -15 -6 -30 Q -4 -16 0 -35 Q 4 -16 6 -30 Q 10 -15 12 -25 Q 20 -18 20 0 Z"
               fill={`url(#combGradient-${size})`}>
@@ -231,7 +224,6 @@ export function AnimatedChickenMascot({
             </circle>
           </g>
 
-          {/* Wattle */}
           <g transform="translate(0, 52)" filter={`url(#strongGlowChicken-${size})`}>
             <ellipse cx="-10" cy="0" rx="10" ry="18" fill={`url(#combGradient-${size})`}>
               <animate attributeName="ry" values="18;20;18" dur="2s" repeatCount="indefinite"/>
@@ -241,13 +233,11 @@ export function AnimatedChickenMascot({
             </ellipse>
           </g>
 
-          {/* Beak */}
           <g filter={`url(#strongGlowChicken-${size})`}>
             <path d="M 0 15 L -7 28 L 7 28 Z"  fill={`url(#beakGradient-${size})`}/>
             <path d="M 0 28 L -6 38 L 6 38 Z"  fill={`url(#beakGradient-${size})`}/>
           </g>
 
-          {/* Eyes */}
           <g filter={`url(#strongGlowChicken-${size})`}>
             <g transform="translate(-24, -8)">
               <circle r="17" fill={`url(#eyeGradientChicken-${size})`}/>
@@ -275,7 +265,6 @@ export function AnimatedChickenMascot({
             </g>
           </g>
 
-          {/* Cheeks */}
           <circle cx="-60" cy="10" r="12" fill="#fb7185" opacity="0.25">
             <animate attributeName="opacity" values="0.25;0.35;0.25" dur="3s" repeatCount="indefinite"/>
           </circle>
@@ -283,14 +272,7 @@ export function AnimatedChickenMascot({
             <animate attributeName="opacity" values="0.25;0.35;0.25" dur="3s" repeatCount="indefinite" begin="0.5s"/>
           </circle>
 
-          {/* ═══ ÓCULOS — sobrepostos aos olhos, dentro do grupo da cabeça ═══
-              Olho esquerdo centrado em (-24, -8), olho direito em (24, -8)
-              Lentes ligeiramente maiores que os olhos (r=17 → rx=21 ry=19)
-              A haste esquerda vai até ao canto da cabeça (-62,−8)
-              A haste direita vai até ao canto da cabeça ( 62,−8)          */}
           <g filter={`url(#glassGlow-${size})`}>
-
-            {/* Lente esquerda */}
             <ellipse cx="-24" cy="-8" rx="21" ry="19"
               fill={activeGrad.glassFill}
               stroke={activeGrad.glassStroke}
@@ -299,7 +281,6 @@ export function AnimatedChickenMascot({
               <animate attributeName="stroke-opacity" values="0.85;1;0.85" dur="2.5s" repeatCount="indefinite"/>
             </ellipse>
 
-            {/* Lente direita */}
             <ellipse cx="24" cy="-8" rx="21" ry="19"
               fill={activeGrad.glassFill}
               stroke={activeGrad.glassStroke}
@@ -308,39 +289,34 @@ export function AnimatedChickenMascot({
               <animate attributeName="stroke-opacity" values="0.85;1;0.85" dur="2.5s" repeatCount="indefinite" begin="0.3s"/>
             </ellipse>
 
-            {/* Ponte entre as lentes */}
             <path d="M -3 -8 Q 0 -13 3 -8"
               fill="none"
               stroke={`url(#glassGrad-${size})`}
               strokeWidth="2"
               strokeLinecap="round"/>
 
-            {/* Haste esquerda */}
             <path d="M -45 -8 Q -54 -10 -62 -8"
               fill="none"
               stroke={`url(#glassGrad-${size})`}
               strokeWidth="2"
               strokeLinecap="round"/>
 
-            {/* Haste direita */}
             <path d="M 45 -8 Q 54 -10 62 -8"
               fill="none"
               stroke={`url(#glassGrad-${size})`}
               strokeWidth="2"
               strokeLinecap="round"/>
 
-            {/* Brilho lente esquerda */}
             <ellipse cx="-29" cy="-14" rx="5" ry="3"
               fill="white" opacity="0.35"
               transform="rotate(-20 -29 -14)"/>
 
-            {/* Brilho lente direita */}
             <ellipse cx="19" cy="-14" rx="5" ry="3"
               fill="white" opacity="0.35"
               transform="rotate(-20 19 -14)"/>
           </g>
 
-        </g>{/* end head group */}
+        </g>
 
         {/* ═══ LEGS ═══ */}
         <g transform="translate(200, 400)" filter={`url(#glowChicken-${size})`}>
