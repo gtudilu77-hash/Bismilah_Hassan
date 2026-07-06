@@ -530,8 +530,11 @@ export function VisionAI({ onBack }: { onBack: () => void }) {
 
       {/* VIDEO */}
       <div className="absolute inset-0 z-0">
+        {/* style transform:scaleX(1) força explicitamente a NÃO espelhar a câmera,
+            independentemente de qualquer comportamento por defeito do browser/SO */}
         <video ref={videoRef} autoPlay playsInline muted
-          className="w-full h-full object-cover brightness-[0.7] contrast-[1.2]" />
+          className="w-full h-full object-cover brightness-[0.7] contrast-[1.2]"
+          style={{ transform: 'scaleX(1)', WebkitTransform: 'scaleX(1)' }} />
 
         {status === 'SCANNING' && (
           <motion.div
