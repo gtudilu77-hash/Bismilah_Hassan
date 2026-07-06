@@ -179,23 +179,23 @@ export function AnimatedChickenMascot({
           <ellipse cx="-25" cy="-35" rx="45" ry="55"
             fill={`url(#headShineGradient-${size})`} opacity="0.5"/>
 
-          {/* Wings — esquerda e direita, proporcionais ao corpo (corrigido) */}
-          <g transform="translate(-68, -5)" filter={`url(#glowChicken-${size})`}>
-            <ellipse rx="26" ry="45" fill={`url(#wingsGradient-${size})`} opacity="0.95">
+          {/* Wing — leque de penas finas, mesmo estilo das penas da cauda (design original) */}
+          <g transform="translate(66, -18)" filter={`url(#glowChicken-${size})`}>
+            <path d="M 0 0 Q 15 -20 18 -38 Q 16 -24 14 -12 Q 12 -4 8 2 Z" fill={`url(#wingsGradient-${size})`}>
               <animateTransform attributeName="transform" type="rotate"
-                values={isGesturing ? "0 0 0;-25 0 0;0 0 0" : "0 0 0;-8 0 0;0 0 0"}
+                values={isGesturing ? "0 0 0;20 0 0;0 0 0" : "0 0 0;7 0 0;0 0 0"}
                 dur={isGesturing ? "1s" : "3s"} repeatCount="indefinite"/>
-            </ellipse>
-            <ellipse rx="20" ry="36" fill={`url(#headShineGradient-${size})`} opacity="0.4"/>
-          </g>
-
-          <g transform="translate(68, -5) scale(-1,1)" filter={`url(#glowChicken-${size})`}>
-            <ellipse rx="26" ry="45" fill={`url(#wingsGradient-${size})`} opacity="0.95">
+            </path>
+            <path d="M -4 3 Q 8 -14 11 -32 Q 9 -18 7 -8 Q 6 0 2 4 Z" fill={`url(#wingsGradient-${size})`} opacity="0.9">
               <animateTransform attributeName="transform" type="rotate"
-                values={isGesturing ? "0 0 0;25 0 0;0 0 0" : "0 0 0;8 0 0;0 0 0"}
-                dur={isGesturing ? "1s" : "3s"} repeatCount="indefinite"/>
-            </ellipse>
-            <ellipse rx="20" ry="36" fill={`url(#headShineGradient-${size})`} opacity="0.4"/>
+                values={isGesturing ? "0 0 0;16 0 0;0 0 0" : "0 0 0;6 0 0;0 0 0"}
+                dur={isGesturing ? "1.1s" : "3.2s"} repeatCount="indefinite"/>
+            </path>
+            <path d="M 4 3 Q 18 -10 22 -30 Q 19 -16 16 -6 Q 13 2 10 5 Z" fill={`url(#wingsGradient-${size})`} opacity="0.85">
+              <animateTransform attributeName="transform" type="rotate"
+                values={isGesturing ? "0 0 0;24 0 0;0 0 0" : "0 0 0;8 0 0;0 0 0"}
+                dur={isGesturing ? "0.9s" : "2.8s"} repeatCount="indefinite"/>
+            </path>
           </g>
 
           {/* Tail feathers */}
