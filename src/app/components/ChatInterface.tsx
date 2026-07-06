@@ -6,7 +6,7 @@ import {
   Volume2, VolumeX, CheckCircle2, BookOpen, Brain, ListChecks,
   ChevronRight, ChevronLeft, X, RotateCcw, Trophy, Sparkles,
   GraduationCap, Clock, Star, Plus, PanelLeftClose, PanelLeftOpen,
-  Menu
+  Menu, FileText, Download
 } from 'lucide-react';
 import { db, auth } from "../../firebase";
 import {
@@ -29,7 +29,8 @@ interface ChatInterfaceProps {
 interface Flashcard { front: string; back: string; mastered: boolean; }
 interface QuizQuestion { question: string; options: string[]; correct: number; }
 interface Topic { title: string; subtopics: string[]; color: string; }
-type SidePanelMode = 'none' | 'flashcards' | 'quiz' | 'organizer';
+interface StudyMaterial { titulo: string; descricao?: string; arquivoUrl?: string; tipo?: string; autor?: string; }
+type SidePanelMode = 'none' | 'flashcards' | 'quiz' | 'organizer' | 'material';
 
 // ─── Themes ───────────────────────────────────────────────────────────────────
 const THEMES = {
@@ -183,6 +184,76 @@ function AttachButton({
   );
 }
 
+// ─── Material (Document Reader) Panel ─────────────────────────────────────────
+function MaterialPanel({ t, materia, onAskIA, isMobile }: {
+  t: any; materia: StudyMaterial | null; onAskIA: (text: string) => void; isMobile?: boolean;
+}) {
+  if (!materia) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: isMobile ? 16 : 20 }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, textAlign: 'center' }}>
+          <div style={{ width: 64, height: 64, borderRadius: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', background: t.accentDim, border: `1px solid ${t.border}` }}>
+            <FileText size={26} style={{ color: `${t.accent}60` }} />
+          </div>
+          <div>
+            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, maxWidth: 220, lineHeight: 1.6, margin: '0 0 6px', fontWeight: 600 }}>Nenhuma matéria aberta</p>
+            <p style={{ color: `${t.accent}50`, fontSize: 11, maxWidth: 220, lineHeight: 1.6, margin: 0 }}>Abre uma matéria a partir do dashboard para a leres aqui enquanto conversas com a IA</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const isImage = !!materia.tipo?.startsWith('image/');
+  const isPdf   = materia.tipo === 'application/pdf';
+  const isVideo = !!materia.tipo?.startsWith('video/');
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: isMobile ? 16 : 20, gap: isMobile ? 12 : 14 }}>
+      <div>
+        <p style={{ fontSize: 9, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', color: `${t.accent}66`, margin: '0 0 6px' }}>{materia.autor || 'Professor'}</p>
+        <h3 style={{ fontSize: isMobile ? 15 : 17, fontWeight: 900, margin: 0, color: 'rgba(255,255,255,0.92)', lineHeight: 1.3 }}>{materia.titulo}</h3>
+      </div>
+
+      {materia.descricao && (
+        <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', lineHeight: 1.7, margin: 0 }}>{materia.descricao}</p>
+      )}
+
+      <div style={{ flex: 1, borderRadius: 20, overflow: 'hidden', border: `1px solid ${t.border}`, background: 'rgba(0,0,0,0.3)', display: 'flex', minHeight: isMobile ? 220 : 260 }}>
+        {!materia.arquivoUrl ? (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11 }}>Ficheiro indisponível</p>
+          </div>
+        ) : isImage ? (
+          <img src={materia.arquivoUrl} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+        ) : isPdf ? (
+          <iframe src={materia.arquivoUrl} title={materia.titulo} style={{ width: '100%', height: '100%', border: 'none', minHeight: isMobile ? 360 : 480 }} />
+        ) : isVideo ? (
+          <video src={materia.arquivoUrl} controls style={{ width: '100%', maxHeight: 360, margin: 'auto' }} />
+        ) : (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 }}>
+            <FileText size={30} style={{ color: `${t.accent}60` }} />
+            <a
+              href={materia.arquivoUrl}
+              download={materia.titulo}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.15em', color: t.accent, textDecoration: 'none', padding: '10px 18px', borderRadius: 14, background: t.accentDim, border: `1px solid ${t.border}` }}
+            >
+              <Download size={12} /> Descarregar ficheiro
+            </a>
+          </div>
+        )}
+      </div>
+
+      <button
+        onClick={() => onAskIA(`Explique detalhadamente: ${materia.titulo}`)}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: isMobile ? 11 : 12, borderRadius: 18, cursor: 'pointer', background: `linear-gradient(135deg,${t.accent},${t.accentB})`, border: 'none', color: '#000', fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.15em', boxShadow: t.btnGlow, flexShrink: 0 }}
+      >
+        <Sparkles size={13} /> Perguntar à IA sobre isto
+      </button>
+    </div>
+  );
+}
+
 // ─── Flashcard Panel ──────────────────────────────────────────────────────────
 function FlashcardPanel({ t, onGenerate, cards, isLoading, isMobile }: {
   t: any; onGenerate: () => void; cards: Flashcard[]; isLoading: boolean; isMobile?: boolean;
@@ -269,7 +340,7 @@ function QuizPanel({ t, onGenerate, questions, isLoading, isMobile, onComplete }
   const [score, setScore]     = useState(0);
   const [done, setDone]       = useState(false);
   const [answers, setAnswers] = useState<number[]>([]);
-  const [wrong, setWrong]     = useState<string[]>([]);   // ← NOVO: rastreia perguntas erradas
+  const [wrong, setWrong]     = useState<string[]>([]);   // ← rastreia perguntas erradas
 
   const reset = () => {
     setIdx(0); setSel(null); setScore(0);
@@ -392,7 +463,7 @@ function OrganizerPanel({ t, onGenerate, topics, isLoading, isMobile }: {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: isMobile ? 16 : 20, gap: isMobile ? 12 : 14 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <div>
-          <p style={{ fontSize: 9, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.4em', color: `${t.accent}66`, margin: 0 }}>Matéria</p>
+          <p style={{ fontSize: 9, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.4em', color: `${t.accent}66`, margin: 0 }}>Tópicos</p>
           {topics.length > 0 && <p style={{ fontSize: 11, color: t.accent, margin: '4px 0 0', fontWeight: 700 }}>{topics.length} tópicos</p>}
         </div>
         <button onClick={onGenerate} disabled={isLoading} className="tool-btn" style={{ '--ac': t.accent, '--acd': t.accentDim, '--acb': t.border } as any}><Sparkles size={9} /> {isLoading ? 'Organizando...' : 'Organizar'}</button>
@@ -522,6 +593,7 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
   const [flashcards,    setFlashcards]    = useState<Flashcard[]>([]);
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
   const [topics,        setTopics]        = useState<Topic[]>([]);
+  const [activeMaterial, setActiveMaterial] = useState<StudyMaterial | null>(null);
   const [toolLoading,   setToolLoading]   = useState<SidePanelMode>('none');
   const [hoveredMsg,    setHoveredMsg]    = useState<string | null>(null);
   const [sidebarOpen,   setSidebarOpen]   = useState(true);
@@ -542,6 +614,22 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
   const navigationRole = location.state?.role;
   const currentRole    = (role || navigationRole || (isTeacher ? 'professor' : 'normal')) as keyof typeof THEMES;
   const t              = THEMES[currentRole] ?? THEMES.normal;
+
+  // ─── Recebe uma matéria (e/ou prompt) vinda do dashboard via navigate(state) ──
+  // Abre automaticamente o painel lateral de leitura, tal como o Claude abre
+  // um artefacto ao lado da conversa, para o utilizador ler e perguntar em simultâneo.
+  useEffect(() => {
+    const navState: any = location.state || {};
+    if (navState.materia) {
+      setActiveMaterial(navState.materia);
+      setSidePanel('material');
+      if (isMobile) setSidebarOpen(false);
+    }
+    if (navState.prompt) {
+      setInputValue(navState.prompt);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (sidePanel !== 'none' && !isMobile) setSidebarOpen(false);
@@ -672,7 +760,7 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
     setToolLoading('none');
   };
 
-  // ─── NOVO: callback chamada quando o quiz termina ─────────────────────────
+  // ─── Callback chamada quando o quiz termina ────────────────────────────────
   const handleQuizComplete = useCallback((score: number, total: number, wrong: string[]) => {
     // Extrai o tópico da última mensagem do utilizador (primeiros 40 chars)
     const lastUserMsg = [...messages].reverse().find(m => m.sender === 'user');
@@ -696,9 +784,10 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
   };
 
   const TOOLS = [
+    { id: 'material'   as SidePanelMode, icon: FileText,   label: 'Matéria' },
     { id: 'flashcards' as SidePanelMode, icon: BookOpen,   label: 'Cards' },
     { id: 'quiz'       as SidePanelMode, icon: Brain,      label: 'Quiz' },
-    { id: 'organizer'  as SidePanelMode, icon: ListChecks, label: 'Matéria' },
+    { id: 'organizer'  as SidePanelMode, icon: ListChecks, label: 'Tópicos' },
   ];
 
   const showWelcome = messages.length <= 1;
@@ -771,7 +860,7 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
 
           <div style={{ padding: isMobile ? '12px 12px 10px' : '14px 14px 10px', borderBottom: `1px solid ${t.border}` }}>
             <p style={{ fontSize: 8, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.4em', color: `${t.accent}35`, margin: '0 0 10px 4px' }}>Estudo</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8 }}>
               {TOOLS.map(({ id, icon: Icon, label }) => {
                 const active = sidePanel === id;
                 return (
@@ -855,7 +944,7 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
                   </button>
                 )}
                 <span style={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.35em', color: t.accent }}>
-                  {sidePanel === 'flashcards' ? 'Flashcards' : sidePanel === 'quiz' ? 'Quiz' : 'Matéria'}
+                  {sidePanel === 'material' ? 'Matéria' : sidePanel === 'flashcards' ? 'Flashcards' : sidePanel === 'quiz' ? 'Quiz' : 'Tópicos'}
                 </span>
               </div>
               <button onClick={() => setSidePanel('none')} style={{ width: 30, height: 30, borderRadius: 10, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.03)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -872,6 +961,14 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto' }} className="custom-scroll">
+              {sidePanel === 'material' && (
+                <MaterialPanel
+                  t={t}
+                  materia={activeMaterial}
+                  onAskIA={(text) => { setInputValue(text); textareaRef.current?.focus(); }}
+                  isMobile={isMobile}
+                />
+              )}
               {sidePanel === 'flashcards' && (
                 <FlashcardPanel t={t} cards={flashcards} onGenerate={generateFlashcards} isLoading={toolLoading === 'flashcards'} isMobile={isMobile} />
               )}
