@@ -179,14 +179,23 @@ export function AnimatedChickenMascot({
           <ellipse cx="-25" cy="-35" rx="45" ry="55"
             fill={`url(#headShineGradient-${size})`} opacity="0.5"/>
 
-          {/* Wings */}
-          <g transform="translate(-70, -10)" filter={`url(#glowChicken-${size})`}>
-            <ellipse rx="42" ry="70" fill={`url(#wingsGradient-${size})`} opacity="0.95">
+          {/* Wings — esquerda e direita, proporcionais ao corpo (corrigido) */}
+          <g transform="translate(-68, -5)" filter={`url(#glowChicken-${size})`}>
+            <ellipse rx="26" ry="45" fill={`url(#wingsGradient-${size})`} opacity="0.95">
               <animateTransform attributeName="transform" type="rotate"
                 values={isGesturing ? "0 0 0;-25 0 0;0 0 0" : "0 0 0;-8 0 0;0 0 0"}
                 dur={isGesturing ? "1s" : "3s"} repeatCount="indefinite"/>
             </ellipse>
-            <ellipse rx="35" ry="60" fill={`url(#headShineGradient-${size})`} opacity="0.4"/>
+            <ellipse rx="20" ry="36" fill={`url(#headShineGradient-${size})`} opacity="0.4"/>
+          </g>
+
+          <g transform="translate(68, -5) scale(-1,1)" filter={`url(#glowChicken-${size})`}>
+            <ellipse rx="26" ry="45" fill={`url(#wingsGradient-${size})`} opacity="0.95">
+              <animateTransform attributeName="transform" type="rotate"
+                values={isGesturing ? "0 0 0;25 0 0;0 0 0" : "0 0 0;8 0 0;0 0 0"}
+                dur={isGesturing ? "1s" : "3s"} repeatCount="indefinite"/>
+            </ellipse>
+            <ellipse rx="20" ry="36" fill={`url(#headShineGradient-${size})`} opacity="0.4"/>
           </g>
 
           {/* Tail feathers */}
