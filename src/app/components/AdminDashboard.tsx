@@ -4,7 +4,7 @@ import {
   collection, onSnapshot, query, orderBy, limit,
   doc, getDoc, getDocs, setDoc, serverTimestamp
 } from "firebase/firestore";
-import { signOut, getAuth, createUserWithEmailAndPassword } from "firebase/auth";
+import { signOut, getAuth, createUserWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import { initializeApp, getApps } from "firebase/app";
 import { useNavigate } from "react-router-dom";
 import { AnimatedChickenMascot } from "../components/AnimatedChickenMascot";
@@ -91,30 +91,37 @@ function Drawer({ open, onClose, title, children }: { open: boolean; onClose: ()
  * Ao criar a conta na instância secundária e fazer signOut só dela,
  * a sessão do admin (na instância principal) nunca é tocada.
  */
+function generateTempPassword(length = 20) {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&*';
+  const arr = new Uint32Array(length);
+  crypto.getRandomValues(arr);
+  let pass = '';
+  for (let i = 0; i < length; i++) pass += chars[arr[i] % chars.length];
+  return pass;
+}
+
 function CreateUserModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [role, setRole] = useState<'aluno' | 'professor'>('aluno');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<{ email: string; password: string } | null>(null);
+  const [success, setSuccess] = useState<{ email: string } | null>(null);
 
   if (!open) return null;
 
-  const resetFields = () => { setName(''); setEmail(''); setPassword(''); setRole('aluno'); setError(null); };
+  const resetFields = () => { setName(''); setEmail(''); setRole('aluno'); setError(null); };
   const handleClose = () => { onClose(); resetFields(); setSuccess(null); };
 
   const friendlyError = (code: string) => {
     if (code.includes('email-already-in-use')) return 'Este email já está registado.';
-    if (code.includes('weak-password'))        return 'A password deve ter pelo menos 6 caracteres.';
     if (code.includes('invalid-email'))        return 'Email inválido.';
     return 'Não foi possível criar a conta. Tenta novamente.';
   };
 
   const handleCreate = async () => {
-    if (!name.trim() || !email.trim() || password.length < 6) {
-      setError('Preenche nome e email, com password de 6+ caracteres.');
+    if (!name.trim() || !email.trim()) {
+      setError('Preenche o nome e o email.');
       return;
     }
     setLoading(true);
@@ -124,7 +131,10 @@ function CreateUserModal({ open, onClose }: { open: boolean; onClose: () => void
       const secondaryApp = existing || initializeApp(auth.app.options, 'Secondary');
       const secondaryAuth = getAuth(secondaryApp);
 
-      const cred = await createUserWithEmailAndPassword(secondaryAuth, email.trim(), password);
+      // Password aleatória gerada só para satisfazer o Firebase Auth — ninguém
+      // precisa de a saber, porque a pessoa vai definir a sua própria a
+      // partir do email que recebe a seguir.
+      const cred = await createUserWithEmailAndPassword(secondaryAuth, email.trim(), generateTempPassword());
 
       await setDoc(doc(db, 'users', cred.user.uid), {
         name: name.trim(),
@@ -133,9 +143,13 @@ function CreateUserModal({ open, onClose }: { open: boolean; onClose: () => void
         createdAt: serverTimestamp(),
       });
 
+      // Envia um email real (via Firebase) com um link para a pessoa definir
+      // a própria password — nada de partilhar credenciais manualmente.
+      await sendPasswordResetEmail(secondaryAuth, email.trim());
+
       await signOut(secondaryAuth);
 
-      setSuccess({ email: email.trim(), password });
+      setSuccess({ email: email.trim() });
       resetFields();
     } catch (err: any) {
       setError(friendlyError(err?.code || ''));
@@ -163,9 +177,9 @@ function CreateUserModal({ open, onClose }: { open: boolean; onClose: () => void
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ padding: 16, borderRadius: 18, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)' }}>
               <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 900, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.2em' }}>Conta criada!</p>
-              <p style={{ margin: 0, fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Partilha estas credenciais com a pessoa:</p>
-              <p style={{ margin: '10px 0 0', fontSize: 12, fontFamily: 'monospace', color: '#fff' }}>Email: {success.email}</p>
-              <p style={{ margin: '2px 0 0', fontSize: 12, fontFamily: 'monospace', color: '#fff' }}>Password: {success.password}</p>
+              <p style={{ margin: 0, fontSize: 12, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 }}>
+                Foi enviado um email para <span style={{ fontFamily: 'monospace', color: '#fff' }}>{success.email}</span> com um link para a pessoa definir a própria password. Pede-lhe para verificar a caixa de entrada (e o spam).
+              </p>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setSuccess(null)} style={{ flex: 1, padding: '12px', borderRadius: 16, background: 'rgba(168,85,247,0.15)', border: '1px solid rgba(168,85,247,0.3)', color: '#a855f7', fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em', cursor: 'pointer' }}>
@@ -200,8 +214,6 @@ function CreateUserModal({ open, onClose }: { open: boolean; onClose: () => void
               style={{ padding: '13px 16px', borderRadius: 16, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 13, outline: 'none' }} />
             <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" type="email"
               style={{ padding: '13px 16px', borderRadius: 16, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 13, outline: 'none' }} />
-            <input value={password} onChange={e => setPassword(e.target.value)} placeholder="Password temporária (6+ caracteres)" type="text"
-              style={{ padding: '13px 16px', borderRadius: 16, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 13, outline: 'none', fontFamily: 'monospace' }} />
 
             {error && (
               <p style={{ margin: 0, fontSize: 11, color: '#f87171', display: 'flex', alignItems: 'center', gap: 6 }}>
