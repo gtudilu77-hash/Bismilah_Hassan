@@ -11,10 +11,11 @@ import {
   Menu, FileText, Download, Copy, Check
 } from 'lucide-react';
 import { db, auth } from "../../firebase";
+import { onAuthStateChanged } from "firebase/auth";
 import {
   collection, addDoc, serverTimestamp, doc,
   setDoc, query, orderBy, onSnapshot, limit,
-  getDoc, updateDoc, arrayUnion
+  getDoc, updateDoc, arrayUnion, where
 } from "firebase/firestore";
 
 // ─── Env ──────────────────────────────────────────────────────────────────────
@@ -710,8 +711,23 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, isTyping]);
 
   useEffect(() => {
-    const q = query(collection(db, "chats"), orderBy("createdAt", "desc"), limit(15));
-    return onSnapshot(q, snap => setChatHistories(snap.docs.map(d => ({ id: d.id, title: d.data().title || "Protocolo Ativo" }))));
+    // ✅ FIX: antes buscava toda a coleção "chats" sem filtro — qualquer
+    // utilizador via o histórico (e podia abrir a conversa) de todos os
+    // outros. Cada chat já grava "userId" ao ser criado; agora filtramos
+    // por ele e re-subscrevemos sempre que o utilizador autenticado muda.
+    let unsubChats: (() => void) | null = null;
+    const unsubAuth = onAuthStateChanged(auth, (u) => {
+      if (unsubChats) { unsubChats(); unsubChats = null; }
+      if (!u) { setChatHistories([]); return; }
+      const q = query(
+        collection(db, "chats"),
+        where("userId", "==", u.uid),
+        orderBy("createdAt", "desc"),
+        limit(15)
+      );
+      unsubChats = onSnapshot(q, snap => setChatHistories(snap.docs.map(d => ({ id: d.id, title: d.data().title || "Protocolo Ativo" }))));
+    });
+    return () => { unsubAuth(); if (unsubChats) unsubChats(); };
   }, []);
 
   useEffect(() => {
