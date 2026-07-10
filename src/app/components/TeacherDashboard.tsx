@@ -474,9 +474,9 @@ export default function TeacherDashboard() {
                   <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"/> Status: Operacional
                 </div>
               </div>
-              <div className="relative shrink-0 w-full max-w-[220px] sm:max-w-[260px] lg:max-w-none mx-auto">
+              <div className="relative shrink-0 w-full max-w-[220px] sm:max-w-[260px] lg:w-auto lg:max-w-none mx-auto lg:mx-0">
                 <div className="absolute inset-0 rounded-full blur-[60px]" style={{background:`${T.accent}20`}}/>
-                <div className="relative p-6 sm:p-8 rounded-3xl bg-black/30 border border-white/10 backdrop-blur-2xl scale-x-[-1]">
+                <div className="relative flex items-center justify-center p-6 sm:p-8 rounded-3xl bg-black/30 border border-white/10 backdrop-blur-2xl scale-x-[-1]">
                   <AnimatedChickenMascot size="medium" isGesturing/>
                 </div>
               </div>
