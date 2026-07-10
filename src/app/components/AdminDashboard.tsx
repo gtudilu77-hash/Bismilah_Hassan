@@ -2,21 +2,22 @@ import { useEffect, useState } from "react";
 import { db, auth } from "../../firebase";
 import {
   collection, onSnapshot, query, orderBy, limit,
-  doc, getDoc, getDocs
+  doc, getDoc, getDocs, setDoc, serverTimestamp
 } from "firebase/firestore";
-import { signOut } from "firebase/auth";
+import { signOut, getAuth, createUserWithEmailAndPassword } from "firebase/auth";
+import { initializeApp, getApps } from "firebase/app";
 import { useNavigate } from "react-router-dom";
 import { AnimatedChickenMascot } from "../components/AnimatedChickenMascot";
 import {
   MessageSquare, Users, Activity, Mail, LogOut,
   ChevronRight, Loader2, AlertCircle, X, Clock,
   Search, ArrowLeft, Hash, User, Shield, Eye,
-  BarChart2, Inbox, Database
+  BarChart2, Inbox, Database, UserPlus
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Message { id: string; text: string; sender: string; timestamp?: any; }
-interface Contact  { id: string; name: string; email: string; message: string; timestamp?: any; }
+interface Contact  { id: string; name: string; email: string; subject?: string; message: string; createdAt?: any; }
 interface ChatRoom { id: string; title: string; createdAt?: any; userId?: string; msgCount?: number; }
 interface ChatMsg  { id: string; text: string; sender: string; timestamp?: any; }
 interface UserProfile { id: string; name?: string; email: string; role: string; createdAt?: any; }
@@ -80,6 +81,149 @@ function Drawer({ open, onClose, title, children }: { open: boolean; onClose: ()
   );
 }
 
+/**
+ * Modal para criar contas de aluno/professor.
+ *
+ * Usa uma instância SECUNDÁRIA do Firebase App só para o
+ * createUserWithEmailAndPassword. Isto é necessário porque, no SDK
+ * client-side, criar uma conta troca automaticamente a sessão activa
+ * para a conta recém-criada — o que expulsaria o admin do painel.
+ * Ao criar a conta na instância secundária e fazer signOut só dela,
+ * a sessão do admin (na instância principal) nunca é tocada.
+ */
+function CreateUserModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [role, setRole] = useState<'aluno' | 'professor'>('aluno');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<{ email: string; password: string } | null>(null);
+
+  if (!open) return null;
+
+  const resetFields = () => { setName(''); setEmail(''); setPassword(''); setRole('aluno'); setError(null); };
+  const handleClose = () => { onClose(); resetFields(); setSuccess(null); };
+
+  const friendlyError = (code: string) => {
+    if (code.includes('email-already-in-use')) return 'Este email já está registado.';
+    if (code.includes('weak-password'))        return 'A password deve ter pelo menos 6 caracteres.';
+    if (code.includes('invalid-email'))        return 'Email inválido.';
+    return 'Não foi possível criar a conta. Tenta novamente.';
+  };
+
+  const handleCreate = async () => {
+    if (!name.trim() || !email.trim() || password.length < 6) {
+      setError('Preenche nome e email, com password de 6+ caracteres.');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const existing = getApps().find(a => a.name === 'Secondary');
+      const secondaryApp = existing || initializeApp(auth.app.options, 'Secondary');
+      const secondaryAuth = getAuth(secondaryApp);
+
+      const cred = await createUserWithEmailAndPassword(secondaryAuth, email.trim(), password);
+
+      await setDoc(doc(db, 'users', cred.user.uid), {
+        name: name.trim(),
+        email: email.trim(),
+        role,
+        createdAt: serverTimestamp(),
+      });
+
+      await signOut(secondaryAuth);
+
+      setSuccess({ email: email.trim(), password });
+      resetFields();
+    } catch (err: any) {
+      setError(friendlyError(err?.code || ''));
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div
+      onClick={handleClose}
+      style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{ width: 420, maxWidth: '100%', borderRadius: 28, background: '#0c0714', border: '1px solid rgba(168,85,247,0.25)', boxShadow: '0 0 80px rgba(168,85,247,0.15)', padding: 28, display: 'flex', flexDirection: 'column', gap: 16 }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', color: '#a855f7' }}>Novo Utilizador</span>
+          <button onClick={handleClose} style={{ width: 28, height: 28, borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <X size={13} color="rgba(255,255,255,0.4)" />
+          </button>
+        </div>
+
+        {success ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ padding: 16, borderRadius: 18, background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)' }}>
+              <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 900, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.2em' }}>Conta criada!</p>
+              <p style={{ margin: 0, fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>Partilha estas credenciais com a pessoa:</p>
+              <p style={{ margin: '10px 0 0', fontSize: 12, fontFamily: 'monospace', color: '#fff' }}>Email: {success.email}</p>
+              <p style={{ margin: '2px 0 0', fontSize: 12, fontFamily: 'monospace', color: '#fff' }}>Password: {success.password}</p>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setSuccess(null)} style={{ flex: 1, padding: '12px', borderRadius: 16, background: 'rgba(168,85,247,0.15)', border: '1px solid rgba(168,85,247,0.3)', color: '#a855f7', fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em', cursor: 'pointer' }}>
+                Criar outro
+              </button>
+              <button onClick={handleClose} style={{ flex: 1, padding: '12px', borderRadius: 16, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em', cursor: 'pointer' }}>
+                Fechar
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {(['aluno', 'professor'] as const).map(r => (
+                <button
+                  key={r}
+                  onClick={() => setRole(r)}
+                  style={{
+                    flex: 1, padding: '10px 0', borderRadius: 14, fontSize: 11, fontWeight: 900,
+                    textTransform: 'uppercase', letterSpacing: '0.1em', cursor: 'pointer',
+                    background: role === r ? (r === 'aluno' ? 'rgba(59,130,246,0.18)' : 'rgba(16,185,129,0.18)') : 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${role === r ? (r === 'aluno' ? 'rgba(59,130,246,0.4)' : 'rgba(16,185,129,0.4)') : 'rgba(255,255,255,0.08)'}`,
+                    color: role === r ? (r === 'aluno' ? '#3b82f6' : '#10b981') : 'rgba(255,255,255,0.35)',
+                  }}
+                >
+                  {r === 'aluno' ? 'Aluno' : 'Professor'}
+                </button>
+              ))}
+            </div>
+
+            <input value={name} onChange={e => setName(e.target.value)} placeholder="Nome completo"
+              style={{ padding: '13px 16px', borderRadius: 16, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 13, outline: 'none' }} />
+            <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" type="email"
+              style={{ padding: '13px 16px', borderRadius: 16, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 13, outline: 'none' }} />
+            <input value={password} onChange={e => setPassword(e.target.value)} placeholder="Password temporária (6+ caracteres)" type="text"
+              style={{ padding: '13px 16px', borderRadius: 16, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 13, outline: 'none', fontFamily: 'monospace' }} />
+
+            {error && (
+              <p style={{ margin: 0, fontSize: 11, color: '#f87171', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <AlertCircle size={12} /> {error}
+              </p>
+            )}
+
+            <button
+              onClick={handleCreate}
+              disabled={loading}
+              style={{ padding: '14px', borderRadius: 16, background: 'linear-gradient(135deg,#a855f7,#d946ef)', border: 'none', color: '#fff', fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.2em', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+            >
+              {loading ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <UserPlus size={14} />}
+              {loading ? 'A criar...' : 'Criar Conta'}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -95,6 +239,7 @@ export default function AdminDashboard() {
   // UI
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [search,    setSearch]    = useState('');
+  const [showCreateUser, setShowCreateUser] = useState(false);
 
   // Drawer — user detail
   const [drawerUser,    setDrawerUser]    = useState<UserProfile | null>(null);
@@ -113,7 +258,10 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const qMsg  = query(collection(db, "messages"), orderBy("timestamp", "desc"), limit(50));
-    const qCont = query(collection(db, "contacts"), orderBy("timestamp", "desc"), limit(50));
+    // ✅ FIX: os formulários de contacto (Contact.tsx / TeacherDashboard.tsx)
+    // gravam o campo "createdAt", não "timestamp". Um orderBy num campo que
+    // os documentos não têm faz o Firestore devolver a coleção vazia.
+    const qCont = query(collection(db, "contacts"), orderBy("createdAt", "desc"), limit(50));
     const qChat = query(collection(db, "chats"),    orderBy("createdAt",  "desc"), limit(100));
     const qUser = query(collection(db, "users"));
 
@@ -237,6 +385,14 @@ export default function AdminDashboard() {
             </h2>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {activeTab === 'users' && (
+              <button
+                onClick={() => setShowCreateUser(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', borderRadius: 16, background: 'linear-gradient(135deg,#a855f7,#d946ef)', border: 'none', color: '#fff', fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.15em', cursor: 'pointer' }}
+              >
+                <UserPlus size={13} /> Novo Utilizador
+              </button>
+            )}
             {/* Search */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 16, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
               <Search size={13} style={{ color: 'rgba(255,255,255,0.3)' }} />
@@ -393,11 +549,12 @@ export default function AdminDashboard() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                       <span style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.85)' }}>{c.name}</span>
                       <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>{c.email}</span>
+                      {c.subject && <span style={{ fontSize: 9, color: 'rgba(245,158,11,0.6)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>· {c.subject}</span>}
                     </div>
                     <p style={{ margin: 0, fontSize: 12, color: 'rgba(255,255,255,0.4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.message}</p>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{fmt(c.timestamp, true)}</span>
+                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{fmt(c.createdAt, true)}</span>
                     <ChevronRight size={14} style={{ color: 'rgba(245,158,11,0.4)' }} />
                   </div>
                 </div>
@@ -551,9 +708,16 @@ export default function AdminDashboard() {
               <div>
                 <p style={{ margin: 0, fontSize: 15, fontWeight: 900, color: '#fff' }}>{drawerContact.name}</p>
                 <p style={{ margin: '3px 0 0', fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{drawerContact.email}</p>
-                <p style={{ margin: '3px 0 0', fontSize: 9, color: 'rgba(245,158,11,0.6)', textTransform: 'uppercase', letterSpacing: '0.2em' }}>{fmt(drawerContact.timestamp, true)}</p>
+                <p style={{ margin: '3px 0 0', fontSize: 9, color: 'rgba(245,158,11,0.6)', textTransform: 'uppercase', letterSpacing: '0.2em' }}>{fmt(drawerContact.createdAt, true)}</p>
               </div>
             </div>
+
+            {drawerContact.subject && (
+              <div style={{ padding: '14px 16px', borderRadius: 16, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <p style={{ margin: '0 0 4px', fontSize: 8, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', color: 'rgba(245,158,11,0.6)' }}>Assunto</p>
+                <p style={{ margin: 0, fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{drawerContact.subject}</p>
+              </div>
+            )}
 
             <div style={{ padding: '18px 20px', borderRadius: 18, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
               <p style={{ margin: '0 0 10px', fontSize: 8, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', color: 'rgba(245,158,11,0.6)' }}>Mensagem</p>
@@ -566,6 +730,9 @@ export default function AdminDashboard() {
           </div>
         )}
       </Drawer>
+
+      {/* ══ MODAL — Criar Utilizador ══ */}
+      <CreateUserModal open={showCreateUser} onClose={() => setShowCreateUser(false)} />
 
       <style>{`
         @keyframes ping    { 0%,100%{opacity:1} 50%{opacity:0.4} }
