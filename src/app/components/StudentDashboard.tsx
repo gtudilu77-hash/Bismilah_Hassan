@@ -2,14 +2,16 @@ import { AnimatedChickenMascot } from './AnimatedChickenMascot';
 import {
   LogOut, Eye, MessageSquare, BookOpen, Sparkles,
   ChevronRight, TrendingUp, Target, AlertCircle, Trophy,
-  BarChart2, CheckCircle, XCircle, Brain, ArrowUp, Zap
+  BarChart2, CheckCircle, XCircle, Brain, ArrowUp, Zap,
+  Rocket, Cpu, Users, ArrowRight, Mail, Phone, MapPin,
+  Globe, Send, Facebook, Twitter, Instagram, Linkedin
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import avesLogo from "../../assets/aves.jpeg";
 import { auth, db } from '../../firebase';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
-import { collection, onSnapshot, orderBy, query, doc, getDoc, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { collection, onSnapshot, orderBy, query, doc, getDoc, setDoc, updateDoc, arrayUnion, addDoc, serverTimestamp } from 'firebase/firestore';
 import { StudentMaterialModal } from './StudentMaterialModal';
 
 interface Materia {
@@ -106,7 +108,9 @@ export default function StudentDashboard() {
     totalQuizzes: 0, avgScore: 0, bestTopic: '—',
     weakTopics: [], recentResults: [], streak: 0,
   });
-  const [activeTab, setActiveTab] = useState<'materias' | 'stats'>('materias');
+  const [activeTab, setActiveTab] = useState<'materias' | 'stats' | 'sobre' | 'contacto'>('materias');
+  const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' });
+  const [sending, setSending] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -195,6 +199,17 @@ export default function StudentDashboard() {
   allWrong.forEach(w => { wrongFreq[w] = (wrongFreq[w] || 0) + 1; });
   const topErrors = Object.entries(wrongFreq).sort((a, b) => b[1] - a[1]).slice(0, 3);
 
+  const handleSendContact = async () => {
+    if (!form.name || !form.email || !form.message) return alert('Preenche todos os campos obrigatórios!');
+    setSending(true);
+    try {
+      await addDoc(collection(db, 'contacts'), { ...form, createdAt: serverTimestamp(), role: 'aluno' });
+      alert('Mensagem enviada com sucesso!');
+      setForm({ name: '', email: '', subject: '', message: '' });
+    } catch (e) { console.error(e); alert('Erro ao enviar.'); }
+    setSending(false);
+  };
+
   return (
     <div className="min-h-screen bg-[#050409] text-white relative overflow-x-hidden font-sans">
 
@@ -266,11 +281,16 @@ export default function StudentDashboard() {
       {/* ── TABS ── */}
       <div className="relative z-10 px-4 sm:px-6 mb-8 overflow-x-auto">
         <div className="max-w-7xl mx-auto">
-          <div className="inline-flex bg-white/[0.03] border border-white/[0.08] rounded-2xl p-1">
-            {(['materias', 'stats'] as const).map(tab => (
-              <button key={tab} onClick={() => setActiveTab(tab)}
-                className={`px-4 sm:px-8 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === tab ? 'bg-blue-600 text-white shadow-[0_4px_12px_rgba(37,99,235,0.4)]' : 'text-white/40 hover:text-white/70'}`}>
-                {tab === 'materias' ? '📚 Materiais' : '📊 Progresso'}
+          <div className="inline-flex bg-white/[0.03] border border-white/[0.08] rounded-2xl p-1 gap-1">
+            {([
+              { id: 'materias', label: '📚 Materiais' },
+              { id: 'stats', label: '📊 Progresso' },
+              { id: 'sobre', label: 'ℹ️ Sobre' },
+              { id: 'contacto', label: '✉️ Contacto' },
+            ] as const).map(tab => (
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                className={`px-4 sm:px-8 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-blue-600 text-white shadow-[0_4px_12px_rgba(37,99,235,0.4)]' : 'text-white/40 hover:text-white/70'}`}>
+                {tab.label}
               </button>
             ))}
           </div>
@@ -438,6 +458,155 @@ export default function StudentDashboard() {
                     Pedir ajuda ao A.V.E.S →
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── SOBRE ── */}
+      {activeTab === 'sobre' && (
+        <section className="relative z-10 px-4 sm:px-6 pb-20 sm:pb-32">
+          <div className="max-w-5xl mx-auto space-y-8">
+
+            <div className="rounded-3xl p-6 sm:p-8 md:p-12 border border-blue-500/20 bg-gradient-to-br from-blue-500/[0.06] to-indigo-500/[0.02] flex flex-col lg:flex-row items-center gap-8 lg:gap-10">
+              <div className="flex-1 text-center lg:text-left space-y-4">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs font-bold tracking-widest uppercase">
+                  <Sparkles className="w-3 h-3" /> Inovação Tecnológica
+                </div>
+                <h2 className="text-3xl sm:text-4xl md:text-5xl font-black leading-tight">
+                  Sobre o <span className="bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">A.V.E.S</span>
+                </h2>
+                <p className="text-white/50 leading-relaxed">
+                  Um sistema de inteligência artificial criado para transformar a forma como os professores ensinam e os alunos aprendem — combinando chatbot, visão computacional e personalização adaptativa.
+                </p>
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-xs font-bold text-white/50">
+                  <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" /> Status: Operacional
+                </div>
+              </div>
+              <div className="relative shrink-0 w-full max-w-[220px] sm:max-w-[260px] lg:w-auto lg:max-w-none mx-auto lg:mx-0">
+                <div className="absolute inset-0 rounded-full blur-[60px] bg-blue-500/20" />
+                <div className="relative flex items-center justify-center p-6 sm:p-8 rounded-3xl bg-black/30 border border-white/10 backdrop-blur-2xl">
+                  <AnimatedChickenMascot size="medium" isGesturing theme="blue" />
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {[
+                { icon: Target, title: 'Missão',    desc: 'Tornar a IA acessível para estudantes — ajudando a estudar, praticar e evoluir todos os dias.' },
+                { icon: Rocket, title: 'Visão',     desc: 'Ser referência em educação aumentada por IA no contexto africano e lusófono.' },
+                { icon: Cpu,    title: 'Tecnologia',desc: 'React, GPT-4o, YOLOv8, Firebase — tecnologia de ponta ao serviço da aprendizagem.' },
+              ].map(({ icon: Icon, title, desc }, i) => (
+                <div key={i} className="p-6 sm:p-8 rounded-3xl bg-white/[0.03] border border-white/[0.08] hover:border-blue-500/30 transition-all group">
+                  <div className="w-11 h-11 rounded-2xl flex items-center justify-center mb-5 bg-blue-500/10 border border-blue-500/20 group-hover:scale-110 transition-transform">
+                    <Icon className="w-5 h-5 text-blue-400" />
+                  </div>
+                  <h3 className="text-lg font-black mb-2">{title}</h3>
+                  <p className="text-white/40 text-sm leading-relaxed">{desc}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="p-6 sm:p-8 rounded-3xl border border-blue-500/20 bg-gradient-to-br from-blue-500/[0.06] to-transparent">
+              <h3 className="font-black text-xl mb-6 flex items-center gap-3">
+                <Users className="w-5 h-5 text-blue-400" /> Core Team
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {[
+                  { name: 'Tudilu Manuel',    role: 'Lead Developer', emoji: '🔥' },
+                  { name: 'Elijah Gomes',     role: 'AI Specialist',  emoji: '⚙️' },
+                  { name: 'Kiami De Almeida', role: 'UI Designer',    emoji: '🎨' },
+                ].map((m, i) => (
+                  <div key={i} className="flex items-center gap-4 p-4 rounded-2xl bg-black/30 border border-white/[0.06] hover:border-blue-500/20 transition-all group min-w-0">
+                    <div className="w-11 h-11 rounded-2xl bg-white/5 flex items-center justify-center text-xl group-hover:scale-110 transition-transform shrink-0">{m.emoji}</div>
+                    <div className="min-w-0">
+                      <p className="font-black text-sm truncate">{m.name}</p>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-blue-400">{m.role}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 sm:gap-4">
+              {[{ val: '100%', label: 'Student Dev' }, { val: 'V2.0', label: 'Build' }, { val: '∞', label: 'Future' }].map((s, i) => (
+                <div key={i} className="p-3 sm:p-5 rounded-2xl bg-white/[0.03] border border-white/[0.08] text-center group hover:border-blue-500/20 transition-all">
+                  <p className="text-xl sm:text-2xl md:text-3xl font-black text-blue-400">{s.val}</p>
+                  <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-white/30 mt-1">{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            <button onClick={() => setActiveTab('contacto')} className="w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all hover:scale-[1.02] text-white bg-gradient-to-r from-blue-600 to-indigo-600 shadow-[0_8px_24px_rgba(59,130,246,0.35)]">
+              Entrar em Contacto <ArrowRight className="w-5 h-5" />
+            </button>
+          </div>
+        </section>
+      )}
+
+      {/* ── CONTACTO ── */}
+      {activeTab === 'contacto' && (
+        <section className="relative z-10 px-4 sm:px-6 pb-20 sm:pb-32">
+          <div className="max-w-5xl mx-auto space-y-8">
+
+            <div className="text-center space-y-3">
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-black">Entre em <span className="bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">Contacto</span></h2>
+              <p className="text-white/40 text-sm sm:text-base">Estamos aqui para ajudar. Resposta em até 24 horas.</p>
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold bg-blue-500/10 border border-blue-500/20 text-blue-300">
+                <div className="w-1.5 h-1.5 rounded-full animate-ping bg-blue-400 shrink-0" />
+                <span className="whitespace-nowrap">⚡ Resposta em até 24 horas</span>
+              </div>
+            </div>
+
+            <div className="grid lg:grid-cols-2 gap-8">
+              <div className="space-y-4">
+                {[
+                  { icon: Mail,   title: 'Email',      lines: ['contato@aves.ai', 'suporte@aves.ai'] },
+                  { icon: Phone,  title: 'Telefone',    lines: ['+244 923 456 789', 'Seg - Sex: 8h - 18h'] },
+                  { icon: MapPin, title: 'Localização', lines: ['Luanda, Angola', 'Centro Tecnológico'] },
+                ].map(({ icon: Icon, title, lines }, i) => (
+                  <div key={i} className="p-5 rounded-2xl bg-white/[0.03] border border-white/[0.08] hover:border-blue-500/20 flex items-center gap-4 transition-all group min-w-0">
+                    <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform bg-blue-500/10 border border-blue-500/20">
+                      <Icon className="w-5 h-5 text-blue-400" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-black uppercase tracking-widest text-white/30 mb-1">{title}</p>
+                      {lines.map((l, j) => <p key={j} className="text-sm text-white/70 font-medium truncate">{l}</p>)}
+                    </div>
+                  </div>
+                ))}
+                <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/[0.08]">
+                  <p className="text-xs font-black uppercase tracking-widest text-white/30 mb-4 flex items-center gap-2"><Globe className="w-3.5 h-3.5" /> Canais Oficiais</p>
+                  <div className="flex gap-3">
+                    {[Facebook, Twitter, Instagram, Linkedin].map((Icon, i) => (
+                      <button key={i} className="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-white transition-all hover:scale-110">
+                        <Icon className="w-4 h-4" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-5 sm:p-6 md:p-8 rounded-3xl border border-blue-500/20 bg-gradient-to-br from-blue-500/[0.06] to-indigo-500/[0.03] space-y-4">
+                <h3 className="text-xl font-black mb-2">Envie a sua <span className="text-blue-400">Mensagem</span></h3>
+                {[
+                  { id: 'name',    placeholder: 'Nome completo',       type: 'text' },
+                  { id: 'email',   placeholder: 'O teu melhor e-mail', type: 'email' },
+                  { id: 'subject', placeholder: 'Assunto',             type: 'text' },
+                ].map(f => (
+                  <input key={f.id} type={f.type} placeholder={f.placeholder}
+                    value={form[f.id as keyof typeof form]}
+                    onChange={e => setForm({ ...form, [f.id]: e.target.value })}
+                    className="w-full p-3.5 rounded-2xl bg-black/30 border border-white/[0.08] focus:outline-none text-white placeholder:text-white/20 transition-all text-sm" />
+                ))}
+                <textarea placeholder="Como podemos ajudar?" value={form.message}
+                  onChange={e => setForm({ ...form, message: e.target.value })}
+                  className="w-full p-3.5 h-32 rounded-2xl bg-black/30 border border-white/[0.08] focus:outline-none text-white placeholder:text-white/20 transition-all text-sm resize-none" />
+                <button onClick={handleSendContact} disabled={sending}
+                  className="w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all hover:scale-[1.02] disabled:opacity-50 text-white bg-gradient-to-r from-blue-600 to-indigo-600 shadow-[0_4px_20px_rgba(59,130,246,0.3)]">
+                  {sending ? 'A enviar...' : <><Send className="w-4 h-4" /> Enviar Mensagem</>}
+                </button>
               </div>
             </div>
           </div>
