@@ -13,7 +13,8 @@ import {
 import { db, auth } from "../../firebase";
 import {
   collection, addDoc, serverTimestamp, doc,
-  setDoc, query, orderBy, onSnapshot, limit
+  setDoc, query, orderBy, onSnapshot, limit,
+  getDoc, updateDoc, arrayUnion
 } from "firebase/firestore";
 
 // ─── Env ──────────────────────────────────────────────────────────────────────
@@ -825,8 +826,10 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
   };
 
   // ─── Callback chamada quando o quiz termina ────────────────────────────────
-  const handleQuizComplete = useCallback((score: number, total: number, wrong: string[]) => {
-    // Extrai o tópico da última mensagem do utilizador (primeiros 40 chars)
+  // Grava o resultado directamente no Firestore (studentStats/{uid}), em vez
+  // de depender de uma função global exposta pelo StudentDashboard — assim
+  // funciona mesmo que o aluno nunca tenha passado pelo Dashboard nesta sessão.
+  const handleQuizComplete = useCallback(async (score: number, total: number, wrong: string[]) => {
     const lastUserMsg = [...messages].reverse().find(m => m.sender === 'user');
     const topic = lastUserMsg?.text?.slice(0, 40) || 'Quiz';
 
@@ -838,9 +841,25 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
       wrong,
     };
 
-    // Chama a função global exposta pelo StudentDashboard
-    (window as any).registerQuizResult?.(result);
-  }, [messages]);
+    // Só regista progresso para alunos — professor/normal também podem fazer
+    // quizzes no chat normalmente, mas não têm nenhum "Progresso" onde isto
+    // apareceria, por isso não faz sentido criar esse documento para eles.
+    if (currentRole !== 'aluno') return;
+
+    const u = auth.currentUser;
+    if (!u) return;
+    try {
+      const ref = doc(db, "studentStats", u.uid);
+      const snap = await getDoc(ref);
+      if (snap.exists()) {
+        await updateDoc(ref, { recentResults: arrayUnion(result), totalQuizzes: (snap.data().totalQuizzes || 0) + 1 });
+      } else {
+        await setDoc(ref, { totalQuizzes: 1, recentResults: [result], streak: 1 });
+      }
+    } catch (err) {
+      console.error('Erro ao gravar resultado do quiz:', err);
+    }
+  }, [messages, currentRole]);
 
   const togglePanel = (mode: SidePanelMode) => {
     setSidePanel(p => p === mode ? 'none' : mode);
