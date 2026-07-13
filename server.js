@@ -8,6 +8,7 @@ import fs from "fs";
 import OpenAI from "openai";
 import { execSync } from "child_process";
 import path from "path";
+import admin from "firebase-admin";
 
 const app = express();
 
@@ -65,6 +66,24 @@ const upload = multer({ storage, limits: { fileSize: 100 * 1024 * 1024 } });
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 /* =========================
+   🔔 FIREBASE ADMIN — para envio de push notifications (FCM)
+========================= */
+let firebaseAdminReady = false;
+const firebaseCreds = process.env.FIREBASE_CREDENTIALS;
+if (firebaseCreds) {
+  try {
+    const serviceAccount = JSON.parse(firebaseCreds);
+    admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+    firebaseAdminReady = true;
+    console.log("🔔 [FCM] Firebase Admin ligado — push notifications activas!");
+  } catch (err) {
+    console.error("❌ [FCM] Falha ao inicializar Firebase Admin:", err.message);
+  }
+} else {
+  console.log("⚠️  [FCM] FIREBASE_CREDENTIALS não encontrado — push notifications desactivadas.");
+}
+
+/* =========================
    🧠 AVES SYSTEM PROMPT
 ========================= */
 const AVES_SYSTEM_PROMPT = `
@@ -111,7 +130,7 @@ const deleteFile = (filePath) => {
 /* =========================
    🏠 ROOT / HEALTH
 ========================= */
-app.get("/", (req, res) => res.json({ status: "ONLINE", message: "🔥 A.V.E.S SERVER RUNNING" }));
+app.get("/", (req, res) => res.json({ status: "ONLINE", message: "🔥 A.V.E.S SERVER RUNNING", fcm: firebaseAdminReady }));
 app.get("/health", (req, res) => res.json({ status: "ok" }));
 
 /* =========================
@@ -350,6 +369,79 @@ app.post("/api/tts", async (req, res) => {
 });
 
 /* =========================
+   🔔 PUSH NOTIFICATIONS (FCM)
+========================= */
+// Endpoint genérico: qualquer parte do frontend pode chamar isto para
+// enviar uma push notification a uma lista de tokens FCM. Os tokens de
+// cada utilizador ficam guardados em users/{uid}.fcmTokens no Firestore
+// (ver notifications.ts no frontend).
+app.post("/api/send-push", async (req, res) => {
+  try {
+    if (!firebaseAdminReady) {
+      return res.status(503).json({ success: false, error: "Firebase Admin não configurado no servidor (falta FIREBASE_CREDENTIALS)" });
+    }
+
+    const { tokens, title, body, data } = req.body;
+    if (!Array.isArray(tokens) || tokens.length === 0) {
+      return res.status(400).json({ success: false, error: "tokens (array) é obrigatório" });
+    }
+    if (!title || !body) {
+      return res.status(400).json({ success: false, error: "title e body são obrigatórios" });
+    }
+
+    const message = {
+      notification: { title, body },
+      data: data && typeof data === "object" ? data : {},
+      tokens,
+    };
+
+    const response = await admin.messaging().sendEachForMulticast(message);
+
+    // Identifica tokens inválidos/expirados para o frontend poder limpá-los
+    const invalidTokens = [];
+    response.responses.forEach((r, i) => {
+      if (!r.success) {
+        const code = r.error?.code;
+        if (code === "messaging/invalid-registration-token" || code === "messaging/registration-token-not-registered") {
+          invalidTokens.push(tokens[i]);
+        }
+      }
+    });
+
+    console.log(`🔔 [FCM] Enviado: ${response.successCount} ok, ${response.failureCount} falhas`);
+    res.json({ success: true, successCount: response.successCount, failureCount: response.failureCount, invalidTokens });
+
+  } catch (err) {
+    console.error("❌ /api/send-push:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/* =========================
+   🗑️  ELIMINAR UTILIZADOR (Auth) — usado pelo AdminDashboard
+========================= */
+// O SDK do browser não consegue apagar a conta de autenticação de outra
+// pessoa — só a Admin SDK, do lado do servidor, consegue. O frontend já
+// apaga o perfil no Firestore por conta própria; isto remove também a
+// conta de login em si, para a pessoa deixar de conseguir entrar de todo.
+app.post("/api/delete-user", async (req, res) => {
+  try {
+    if (!firebaseAdminReady) {
+      return res.status(503).json({ success: false, error: "Firebase Admin não configurado no servidor (falta FIREBASE_CREDENTIALS)" });
+    }
+    const { uid } = req.body;
+    if (!uid) return res.status(400).json({ success: false, error: "uid é obrigatório" });
+
+    await admin.auth().deleteUser(uid);
+    console.log(`🗑️  [ADMIN] Conta ${uid} eliminada.`);
+    res.json({ success: true });
+  } catch (err) {
+    console.error("❌ /api/delete-user:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/* =========================
    🚀 SERVER
 ========================= */
 const PORT = process.env.PORT || 3001;
@@ -358,6 +450,7 @@ app.listen(PORT, () => {
 🔥 ===================================
 🚀 A.V.E.S SERVER ONLINE
 🌍 http://localhost:${PORT}
+🔔 FCM: ${firebaseAdminReady ? "activo" : "inactivo (falta FIREBASE_CREDENTIALS)"}
 🔥 ===================================
   `);
 });

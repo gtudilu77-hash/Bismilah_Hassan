@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { db, auth } from "../../firebase";
 import {
   collection, onSnapshot, query, orderBy, limit,
-  doc, getDoc, getDocs, setDoc, serverTimestamp
+  doc, getDoc, getDocs, setDoc, serverTimestamp, deleteDoc
 } from "firebase/firestore";
-import { signOut, getAuth, createUserWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
+import { signOut, getAuth, createUserWithEmailAndPassword, sendPasswordResetEmail, onAuthStateChanged } from "firebase/auth";
 import { initializeApp, getApps } from "firebase/app";
 import { useNavigate } from "react-router-dom";
 import { AnimatedChickenMascot } from "../components/AnimatedChickenMascot";
@@ -12,8 +12,12 @@ import {
   MessageSquare, Users, Activity, Mail, LogOut,
   ChevronRight, Loader2, AlertCircle, X, Clock,
   Search, ArrowLeft, Hash, User, Shield, Eye,
-  BarChart2, Inbox, Database, UserPlus
+  BarChart2, Inbox, Database, UserPlus, Trash2
 } from "lucide-react";
+
+// URL do backend Node — usado (opcionalmente) para apagar de vez a conta
+// de autenticação ao remover um utilizador. Ver nota no handleDeleteUser.
+const API_URL = 'https://bismilah-hassan-1.onrender.com';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Message { id: string; text: string; sender: string; timestamp?: any; }
@@ -37,6 +41,7 @@ const fmt = (ts: any, full = false) => {
 
 const roleColor = (role: string) =>
   role === 'admin'     ? { bg: 'rgba(168,85,247,0.12)', border: 'rgba(168,85,247,0.35)', color: '#a855f7' } :
+  role === 'miniadmin' ? { bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.35)', color: '#f59e0b' } :
   role === 'professor' ? { bg: 'rgba(16,185,129,0.12)', border: 'rgba(16,185,129,0.35)', color: '#10b981' } :
   role === 'aluno'     ? { bg: 'rgba(59,130,246,0.12)', border: 'rgba(59,130,246,0.35)', color: '#3b82f6' } :
                          { bg: 'rgba(255,255,255,0.06)', border: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.4)' };
@@ -100,15 +105,24 @@ function generateTempPassword(length = 20) {
   return pass;
 }
 
-function CreateUserModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+function CreateUserModal({ open, onClose, allowMiniAdmin }: { open: boolean; onClose: () => void; allowMiniAdmin: boolean }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<'aluno' | 'professor'>('aluno');
+  const [role, setRole] = useState<'aluno' | 'professor' | 'miniadmin'>('aluno');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<{ email: string } | null>(null);
 
   if (!open) return null;
+
+  const roleOptions = allowMiniAdmin
+    ? (['aluno', 'professor', 'miniadmin'] as const)
+    : (['aluno', 'professor'] as const);
+
+  const roleLabel = (r: string) => r === 'aluno' ? 'Aluno' : r === 'professor' ? 'Professor' : 'Mini-admin';
+  const roleActiveColor = (r: string) => r === 'aluno' ? '#3b82f6' : r === 'professor' ? '#10b981' : '#f59e0b';
+  const roleActiveBg = (r: string) => r === 'aluno' ? 'rgba(59,130,246,0.18)' : r === 'professor' ? 'rgba(16,185,129,0.18)' : 'rgba(245,158,11,0.18)';
+  const roleActiveBorder = (r: string) => r === 'aluno' ? 'rgba(59,130,246,0.4)' : r === 'professor' ? 'rgba(16,185,129,0.4)' : 'rgba(245,158,11,0.4)';
 
   const resetFields = () => { setName(''); setEmail(''); setRole('aluno'); setError(null); };
   const handleClose = () => { onClose(); resetFields(); setSuccess(null); };
@@ -193,19 +207,19 @@ function CreateUserModal({ open, onClose }: { open: boolean; onClose: () => void
         ) : (
           <>
             <div style={{ display: 'flex', gap: 8 }}>
-              {(['aluno', 'professor'] as const).map(r => (
+              {roleOptions.map(r => (
                 <button
                   key={r}
                   onClick={() => setRole(r)}
                   style={{
                     flex: 1, padding: '10px 0', borderRadius: 14, fontSize: 11, fontWeight: 900,
                     textTransform: 'uppercase', letterSpacing: '0.1em', cursor: 'pointer',
-                    background: role === r ? (r === 'aluno' ? 'rgba(59,130,246,0.18)' : 'rgba(16,185,129,0.18)') : 'rgba(255,255,255,0.04)',
-                    border: `1px solid ${role === r ? (r === 'aluno' ? 'rgba(59,130,246,0.4)' : 'rgba(16,185,129,0.4)') : 'rgba(255,255,255,0.08)'}`,
-                    color: role === r ? (r === 'aluno' ? '#3b82f6' : '#10b981') : 'rgba(255,255,255,0.35)',
+                    background: role === r ? roleActiveBg(r) : 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${role === r ? roleActiveBorder(r) : 'rgba(255,255,255,0.08)'}`,
+                    color: role === r ? roleActiveColor(r) : 'rgba(255,255,255,0.35)',
                   }}
                 >
-                  {r === 'aluno' ? 'Aluno' : 'Professor'}
+                  {roleLabel(r)}
                 </button>
               ))}
             </div>
@@ -253,6 +267,10 @@ export default function AdminDashboard() {
   const [search,    setSearch]    = useState('');
   const [showCreateUser, setShowCreateUser] = useState(false);
 
+  // Papel de quem está logado (admin completo vs mini-admin) — determina
+  // se pode criar/apagar mini-admins, ou só aluno/professor.
+  const [myRole, setMyRole] = useState<string | null>(null);
+
   // Drawer — user detail
   const [drawerUser,    setDrawerUser]    = useState<UserProfile | null>(null);
   const [userChats,     setUserChats]     = useState<ChatRoom[]>([]);
@@ -269,6 +287,13 @@ export default function AdminDashboard() {
   const [drawerContact, setDrawerContact] = useState<Contact | null>(null);
 
   useEffect(() => {
+    const unsubMyRole = onAuthStateChanged(auth, (u) => {
+      if (!u) { setMyRole(null); return; }
+      getDoc(doc(db, "users", u.uid)).then(snap => {
+        setMyRole(snap.exists() ? (snap.data().role || null) : null);
+      }).catch(err => console.error(err));
+    });
+
     const qMsg  = query(collection(db, "messages"), orderBy("timestamp", "desc"), limit(50));
     // ✅ FIX: os formulários de contacto (Contact.tsx / TeacherDashboard.tsx)
     // gravam o campo "createdAt", não "timestamp". Um orderBy num campo que
@@ -283,10 +308,57 @@ export default function AdminDashboard() {
       onSnapshot(qChat, snap => setChatRooms(snap.docs.map(d => ({ id: d.id, ...d.data() })) as ChatRoom[]),      err => console.error(err)),
       onSnapshot(qUser, snap => setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })) as UserProfile[]),       err => console.error(err)),
     ];
-    return () => unsubs.forEach(u => u());
+    return () => { unsubMyRole(); unsubs.forEach(u => u()); }
   }, []);
 
   const handleLogout = async () => { try { await signOut(auth); navigate("/login"); } catch {} };
+
+  // Quem pode apagar quem:
+  // - admin completo: qualquer conta, excepto outro admin (protecção contra
+  //   lockout acidental) e a própria conta
+  // - mini-admin: só aluno/professor, nunca admin nem outro mini-admin
+  const canManageRole = (targetRole: string) => {
+    if (myRole === 'admin') return targetRole !== 'admin';
+    if (myRole === 'miniadmin') return targetRole === 'aluno' || targetRole === 'professor';
+    return false;
+  };
+
+  const handleDeleteUser = async (u: UserProfile) => {
+    if (u.id === auth.currentUser?.uid) {
+      alert('Não podes apagar a tua própria conta.');
+      return;
+    }
+    if (!canManageRole(u.role)) {
+      alert('Sem permissão para apagar esta conta.');
+      return;
+    }
+    if (!window.confirm(`Apagar definitivamente a conta de ${u.email}?`)) return;
+
+    try {
+      // Remove sempre o perfil no Firestore — isto já tira a pessoa de
+      // todas as listagens e, sem "role", ela perde acesso às áreas
+      // restritas da app.
+      await deleteDoc(doc(db, "users", u.id));
+
+      // Tenta também apagar a conta de autenticação a sério, através do
+      // backend (Firebase Admin SDK) — o SDK do browser não tem permissão
+      // para apagar contas de outras pessoas. Se o endpoint ainda não
+      // estiver activo no servidor, falha em silêncio e só o perfil fica
+      // removido (a pessoa consegue voltar a entrar, mas sem role).
+      try {
+        await fetch(`${API_URL}/api/delete-user`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ uid: u.id }),
+        });
+      } catch (backendErr) {
+        console.warn('Backend de eliminação de conta indisponível — só o perfil foi removido.', backendErr);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao apagar utilizador.');
+    }
+  };
 
   // Open user drawer — load their chats
   const openUserDrawer = async (u: UserProfile) => {
@@ -578,15 +650,15 @@ export default function AdminDashboard() {
           {activeTab === 'users' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {/* Table header */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px 120px 40px', gap: 12, padding: '0 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                {['Utilizador', 'Role', 'Desde', ''].map(h => (
-                  <span key={h} style={{ fontSize: 8, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', color: 'rgba(255,255,255,0.2)' }}>{h}</span>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px 120px 32px 40px', gap: 12, padding: '0 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                {['Utilizador', 'Role', 'Desde', '', ''].map((h, i) => (
+                  <span key={`${h}-${i}`} style={{ fontSize: 8, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', color: 'rgba(255,255,255,0.2)' }}>{h}</span>
                 ))}
               </div>
               {filteredUsers.map((u, i) => {
                 const rc = roleColor(u.role);
                 return (
-                  <div key={u.id} onClick={() => openUserDrawer(u)} style={{ display: 'grid', gridTemplateColumns: '1fr 120px 120px 40px', gap: 12, alignItems: 'center', padding: '14px 16px', borderRadius: 18, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer', transition: 'all 0.15s ease', animation: `msgIn 0.3s ease ${i * 0.04}s both` }}
+                  <div key={u.id} onClick={() => openUserDrawer(u)} style={{ display: 'grid', gridTemplateColumns: '1fr 120px 120px 32px 40px', gap: 12, alignItems: 'center', padding: '14px 16px', borderRadius: 18, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer', transition: 'all 0.15s ease', animation: `msgIn 0.3s ease ${i * 0.04}s both` }}
                     onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(168,85,247,0.06)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(168,85,247,0.2)'; }}
                     onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.05)'; }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
@@ -600,6 +672,15 @@ export default function AdminDashboard() {
                     </div>
                     <span style={{ display: 'inline-flex', padding: '4px 10px', borderRadius: 8, fontSize: 9, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.15em', background: rc.bg, border: `1px solid ${rc.border}`, color: rc.color, width: 'fit-content' }}>{u.role}</span>
                     <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)' }}>{fmt(u.createdAt, true) === '—' ? '—' : fmt(u.createdAt, true).split(',')[0]}</span>
+                    {canManageRole(u.role) && u.id !== auth.currentUser?.uid ? (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeleteUser(u); }}
+                        title="Apagar utilizador"
+                        style={{ width: 26, height: 26, borderRadius: 9, border: '1px solid rgba(239,68,68,0.2)', background: 'rgba(239,68,68,0.06)', color: '#f87171', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', justifySelf: 'end' }}
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    ) : <span />}
                     <ChevronRight size={14} style={{ color: 'rgba(168,85,247,0.4)', justifySelf: 'end' }} />
                   </div>
                 );
@@ -744,7 +825,7 @@ export default function AdminDashboard() {
       </Drawer>
 
       {/* ══ MODAL — Criar Utilizador ══ */}
-      <CreateUserModal open={showCreateUser} onClose={() => setShowCreateUser(false)} />
+      <CreateUserModal open={showCreateUser} onClose={() => setShowCreateUser(false)} allowMiniAdmin={myRole === 'admin'} />
 
       <style>{`
         @keyframes ping    { 0%,100%{opacity:1} 50%{opacity:0.4} }
