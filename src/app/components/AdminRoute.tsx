@@ -23,7 +23,12 @@ export function AdminRoute({ children }: AdminRouteProps) {
           const docRef = doc(db, "users", user.uid);
           const snap = await getDoc(docRef);
 
-          if (snap.exists() && snap.data().role === "admin") {
+          // ✅ Admin completo e mini-admin têm ambos acesso ao painel —
+          // as restrições de permissão (o que cada um pode criar/apagar)
+          // são aplicadas dentro do próprio AdminDashboard e nas
+          // firestore.rules, não aqui na entrada da rota.
+          const role = snap.exists() ? snap.data().role : null;
+          if (role === "admin" || role === "miniadmin") {
             setIsAdmin(true);
           } else {
             console.warn("Acesso negado: Usuário não possui privilégios de Admin.");
@@ -37,7 +42,6 @@ export function AdminRoute({ children }: AdminRouteProps) {
         // Sem usuário logado
         setIsAdmin(false);
       }
-      
       // Finaliza o estado de carregamento independente do resultado
       setLoading(false);
     });
@@ -55,7 +59,6 @@ export function AdminRoute({ children }: AdminRouteProps) {
           <div className="absolute inset-0 bg-purple-600/20 blur-3xl rounded-full animate-pulse" />
           <Loader2 className="animate-spin text-purple-500 relative z-10" size={48} />
         </div>
-        
         <div className="text-center space-y-2">
           <p className="text-purple-400 font-black uppercase tracking-[0.4em] text-[10px] animate-pulse">
             Verificando Credenciais
