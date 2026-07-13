@@ -1,6 +1,11 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from ultralytics import YOLO
+# ⚠️ FIX de memória: "from ultralytics import YOLO" deixou de estar aqui em
+# cima. O ultralytics traz o PyTorch como dependência, que sozinho já
+# consome 200-300MB só de ser importado — se isto acontecer logo ao
+# arrancar o Flask, o servidor já começa "pesado" mesmo sem nenhum pedido
+# ter chegado ainda. Agora o import só acontece dentro de get_model(), na
+# primeira vez que é mesmo preciso (ver mais abaixo).
 from PIL import Image
 from openai import OpenAI
 import io, os, base64, time, threading, gc
@@ -45,20 +50,38 @@ if firebase_json:
 else:
     print("❌  FIREBASE_CREDENTIALS não encontrado!")
 
-# ── YOLO — ESTRATÉGIA 1: Lazy loading ────────────────────────────────────────
-# O modelo NÃO é carregado ao arrancar o servidor.
-# É carregado apenas na primeira requisição que precisar dele.
-# Isto evita OOM durante o boot no Railway/Render.
+# ── YOLO — ESTRATÉGIA 1: Lazy loading (import + instância) ───────────────────
+# O import do módulo E a criação do modelo só acontecem na primeira
+# requisição que precisar dele. Isto evita OOM durante o boot no
+# Railway/Render, e adia o maior consumo de memória (PyTorch) para o mais
+# tarde possível — nunca acontece só por o servidor estar ligado e à espera.
 _yolo_model = None
 
 def get_model():
     global _yolo_model
     if _yolo_model is None:
         print("🔄  [YOLO] Carregando modelo pela primeira vez...")
+        from ultralytics import YOLO  # import atrasado — só aqui é que o PyTorch entra em memória
         model_path = "../yolov8n.pt"
         _yolo_model = YOLO(model_path if os.path.exists(model_path) else "yolov8n.pt")
         print("✅  [YOLO] Modelo pronto!")
     return _yolo_model
+
+# ── Redimensionamento — reduz memória/tempo por pedido ───────────────────────
+# O YOLOv8 já redimensiona internamente para o seu imgsz (640px por
+# defeito), mas se lhe entregarmos sempre a imagem no tamanho original da
+# câmara (ex: 1280x720 ou maior), o PIL/numpy chegam a ocupar memória extra
+# antes disso acontecer. Redimensionar aqui, ANTES de entregar ao modelo,
+# evita esse pico desnecessário — sem perda relevante de precisão para
+# deteção de objectos/pessoas.
+MAX_INFERENCE_DIM = 640
+
+def resize_for_inference(img: Image.Image) -> Image.Image:
+    w, h = img.size
+    if max(w, h) <= MAX_INFERENCE_DIM:
+        return img
+    scale = MAX_INFERENCE_DIM / max(w, h)
+    return img.resize((int(w * scale), int(h * scale)))
 
 # ── Config ────────────────────────────────────────────────────────────────────
 CONFIANCA_MINIMA = 0.45
@@ -428,6 +451,7 @@ def processar_frame(image_data: str, user_text: str = "",
 
     img_bytes    = base64.b64decode(image_data)
     img          = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+    img          = resize_for_inference(img)  # ← reduz memória/tempo antes do YOLO
     img_w, img_h = img.size
 
     # ✅ Usa get_model() em vez de model global
@@ -480,6 +504,7 @@ def autonomous_loop():
         try:
             img_bytes    = base64.b64decode(frame)
             img          = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+            img          = resize_for_inference(img)  # ← mesma redução de memória aqui
             img_w, img_h = img.size
 
             # ✅ Usa get_model() em vez de model global
@@ -586,6 +611,7 @@ def enroll():
         nome_doc  = nome.lower()
         img_bytes = base64.b64decode(image_data)
         img       = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+        img       = resize_for_inference(img)  # ← mesma redução de memória aqui
 
         # ✅ Usa get_model()
         results = get_model()(img)

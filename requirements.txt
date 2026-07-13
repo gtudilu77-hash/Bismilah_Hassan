@@ -1,3 +1,10 @@
+# ⚠️ Esta linha é essencial: sem ela, o pip instala o PyTorch com suporte
+# CUDA (para GPU), que é maior e consome mais memória mesmo correndo só em
+# CPU (como acontece no Render) — o teu servidor não tem GPU nenhuma, por
+# isso essa parte do pacote é peso morto que só ocupa RAM/disco à toa.
+# Isto obriga o pip a instalar a versão "CPU-only", bem mais leve.
+--extra-index-url https://download.pytorch.org/whl/cpu
+
 blinker==1.9.0
 certifi==2026.4.22
 click==8.3.3
@@ -8,6 +15,13 @@ Jinja2==3.1.6
 MarkupSafe==3.0.3
 python-dotenv==1.2.2
 Werkzeug==3.1.8
+
+# Declarados explicitamente ANTES do ultralytics, para o pip resolver estes
+# a partir do índice CPU-only acima em vez de deixar o ultralytics puxar a
+# versão por defeito (que inclui CUDA).
+torch
+torchvision
+
 ultralytics
 Pillow
 openai
