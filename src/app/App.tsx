@@ -101,8 +101,9 @@ function AppRoutes() {
         element={
           <PrivateRoute>
 
-            {/* ADMIN */}
-            {role === "admin" && <AdminDashboard />}
+            {/* ADMIN / MINI-ADMIN — o AdminDashboard trata internamente
+                das diferenças de permissão entre os dois */}
+            {(role === "admin" || role === "miniadmin") && <AdminDashboard />}
 
             {/* PROFESSOR */}
             {role === "professor" && <TeacherDashboard />}
@@ -163,11 +164,11 @@ function AppRoutes() {
         }
       />
 
-      {/* 🔴 ADMIN */}
+      {/* 🔴 ADMIN / MINI-ADMIN */}
       <Route
         path="/admin"
         element={
-          <PrivateRoute allowedRoles={["admin"]}>
+          <PrivateRoute allowedRoles={["admin", "miniadmin"]}>
             <AdminDashboard />
           </PrivateRoute>
         }
