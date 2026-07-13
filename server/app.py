@@ -451,14 +451,21 @@ def processar_frame(image_data: str, user_text: str = "",
 
     img_bytes    = base64.b64decode(image_data)
     img          = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-    img          = resize_for_inference(img)  # ← reduz memória/tempo antes do YOLO
-    img_w, img_h = img.size
+    # ⚠️ FIX de precisão: a versão reduzida (img_deteccao) só serve para o
+    # YOLO decidir ONDE está a pessoa — o recorte do rosto para
+    # reconhecimento usa sempre "img" (resolução original). As coordenadas
+    # do YOLO são normalizadas (0–1), por isso funcionam em qualquer
+    # resolução sem perda de precisão na localização; só a NITIDEZ do
+    # recorte enviado ao GPT-4o é que importa para o reconhecimento, e essa
+    # vem sempre da imagem cheia.
+    img_deteccao = resize_for_inference(img)
+    img_w, img_h = img_deteccao.size
 
     # ✅ Usa get_model() em vez de model global
-    results = get_model()(img)
+    results = get_model()(img_deteccao)
     detections, summary, names = processar_yolo(results, img_w, img_h)
 
-    identity          = identificar_com_memoria(img, detections)
+    identity          = identificar_com_memoria(img, detections)  # ← "img" original, não a reduzida
     ULTIMO_UTILIZADOR = identity
 
     for det in detections:
@@ -470,7 +477,7 @@ def processar_frame(image_data: str, user_text: str = "",
     reply = gerar_resposta(identity, names, user_text, proactive_context)
 
     # ✅ ESTRATÉGIA 3: Liberta referências ao frame processado
-    del img, img_bytes, results
+    del img, img_deteccao, img_bytes, results
     gc.collect()
 
     return {
@@ -504,11 +511,11 @@ def autonomous_loop():
         try:
             img_bytes    = base64.b64decode(frame)
             img          = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-            img          = resize_for_inference(img)  # ← mesma redução de memória aqui
-            img_w, img_h = img.size
+            img_deteccao = resize_for_inference(img)  # ← só para o YOLO; "img" original fica para o recorte do rosto
+            img_w, img_h = img_deteccao.size
 
             # ✅ Usa get_model() em vez de model global
-            results = get_model()(img)
+            results = get_model()(img_deteccao)
             detections, summary, names = processar_yolo(results, img_w, img_h)
 
             identity = identificar_com_memoria(img, detections)
@@ -552,7 +559,7 @@ def autonomous_loop():
             }
 
             # ✅ ESTRATÉGIA 3: Liberta memória do frame autónomo
-            del img, img_bytes, results
+            del img, img_deteccao, img_bytes, results
             gc.collect()
 
         except Exception as e:
@@ -611,12 +618,18 @@ def enroll():
         nome_doc  = nome.lower()
         img_bytes = base64.b64decode(image_data)
         img       = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-        img       = resize_for_inference(img)  # ← mesma redução de memória aqui
+        # ⚠️ Aqui é ainda mais importante manter a resolução original: esta
+        # foto vai ficar guardada permanentemente como referência para todo
+        # o reconhecimento futuro — se for gravada já em baixa qualidade,
+        # baixa a precisão de TODOS os reconhecimentos seguintes, não só
+        # deste pedido. O YOLO usa uma cópia reduzida só para localizar a
+        # pessoa; o recorte gravado vem sempre de "img" (original).
+        img_deteccao = resize_for_inference(img)
 
         # ✅ Usa get_model()
-        results = get_model()(img)
-        detections, _, _ = processar_yolo(results, *img.size)
-        pessoa = selecionar_pessoa_principal(detections, *img.size)
+        results = get_model()(img_deteccao)
+        detections, _, _ = processar_yolo(results, *img_deteccao.size)
+        pessoa = selecionar_pessoa_principal(detections, *img_deteccao.size)
 
         if pessoa is None:
             return jsonify({"success": False, "error": "Nenhuma pessoa detetada nesta amostra"}), 200
@@ -625,7 +638,7 @@ def enroll():
         crop_bytes = base64.b64decode(crop_b64)
 
         # ✅ Liberta memória do frame de enroll
-        del img, img_bytes, results
+        del img, img_deteccao, img_bytes, results
         gc.collect()
 
         ts        = int(time.time() * 1000)
