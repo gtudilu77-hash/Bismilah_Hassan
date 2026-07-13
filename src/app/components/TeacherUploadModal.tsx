@@ -1,3 +1,27 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// TeacherUploadModal.tsx
+// ───────────────────────────────────────────────────────────────────────────
+// Modal simples de upload de matéria: título, descrição, ficheiro (PDF ou
+// imagem, convertido para base64) → grava directamente na coleção
+// "materias" do Firestore.
+//
+// ⚠️ REPARA NISTO se te pedirem para "corrigir o upload" ou "porque há
+// duas formas de publicar matéria":
+// Este ficheiro faz EXACTAMENTE a mesma coisa que o "TeacherModal" que já
+// existe dentro de TeacherDashboard.tsx (aba "Enviar Matéria") — os dois
+// escrevem para a mesma coleção "materias", com os mesmos campos
+// (titulo, descricao, arquivoUrl, tipo, dataCriacao, autor). A única
+// diferença real é visual (este é mais simples, sem a aba de "Gerar
+// Perguntas" que o outro tem).
+//
+// Se um exame pedir para "adicionar um campo novo ao upload" (ex: uma
+// disciplina/matéria associada), e só editares um dos dois ficheiros, o
+// outro continua a funcionar à moda antiga — se este componente estiver
+// mesmo a ser usado nalgum sítio da app (confirma com um
+// `grep -rn "TeacherUploadModal" src/` no terminal), lembra-te de editar
+// os dois em conjunto para não ficarem inconsistentes.
+// ═══════════════════════════════════════════════════════════════════════════
+
 import { useState } from 'react';
 import { X, Upload, FileText, CheckCircle2, Loader2 } from 'lucide-react';
 import { db } from '../../firebase';
@@ -14,9 +38,18 @@ export function TeacherUploadModal({ isOpen, onClose }: UploadModalProps) {
   const [description, setDescription] = useState('');
   const [uploading, setUploading] = useState(false);
 
+  // Padrão comum a todos os modais desta app: se não estiver aberto, não
+  // renderiza nada (evita ter de gerir visibilidade via CSS/classes).
   if (!isOpen) return null;
 
-  // Função auxiliar para transformar o ficheiro em String Base64
+  // Converte o ficheiro seleccionado (PDF/imagem) para uma string base64,
+  // que depois é guardada directamente no campo "arquivoUrl" do documento
+  // Firestore — ou seja, o próprio ficheiro fica "dentro" da base de
+  // dados, não num link externo. Simples de implementar, mas atenção:
+  // ficheiros grandes tornam os documentos do Firestore pesados (o limite
+  // por documento é 1 MiB) — se pedirem para suportar ficheiros maiores,
+  // a solução certa é subir para o Firebase Storage e guardar só o URL
+  // aqui, não o ficheiro inteiro em base64.
   const convertToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -33,15 +66,18 @@ export function TeacherUploadModal({ isOpen, onClose }: UploadModalProps) {
     setUploading(true);
 
     try {
-      // Convertemos o PDF/Imagem para texto legível pela Base de Dados
+      // Converte o ficheiro para base64 antes de gravar
       const base64String = await convertToBase64(file);
 
-      // Enviamos diretamente para a coleção do Firestore que já funciona!
+      // Grava directamente na coleção "materias" — é a mesma coleção que
+      // o StudentDashboard e o TeacherDashboard leem para mostrar as
+      // matérias disponíveis, por isso não precisas de mexer em mais
+      // nenhum sítio para isto aparecer lá.
       await addDoc(collection(db, "materias"), {
         titulo: title,
         descricao: description,
-        arquivoUrl: base64String, // Agora o link é a própria string do ficheiro!
-        tipo: file.type,
+        arquivoUrl: base64String, // o próprio conteúdo do ficheiro, não um link
+        tipo: file.type,          // ex: "application/pdf", "image/png" — usado para decidir como mostrar o ficheiro depois
         dataCriacao: serverTimestamp(),
         autor: "Professor"
       });
@@ -89,7 +125,9 @@ export function TeacherUploadModal({ isOpen, onClose }: UploadModalProps) {
             className="w-full p-3 h-24 rounded-xl bg-white/5 border border-white/10 text-white"
           />
 
-          {/* FILE */}
+          {/* FILE — input real fica invisível (opacity-0) por cima da área
+              visual, para o clique em qualquer parte desta caixa abrir o
+              selector de ficheiros do sistema operativo */}
           <div className="relative border border-dashed border-white/20 rounded-2xl p-6 text-center">
             <input
               type="file"

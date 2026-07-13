@@ -1,3 +1,28 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// Login.tsx
+// ───────────────────────────────────────────────────────────────────────────
+// Ecrã de autenticação do A.V.E.S. Suporta 3 formas de entrar:
+//   1. Email + password (signInWithEmailAndPassword)
+//   2. Google          (signInWithPopup + GoogleAuthProvider)
+//   3. GitHub          (signInWithPopup + GithubAuthProvider)
+//
+// Depois de qualquer uma destas autenticar com sucesso, o código verifica
+// se já existe um perfil em users/{uid} no Firestore — se não existir,
+// cria um perfil básico (nome, email, foto). É esse documento users/{uid}
+// que o resto da app usa para saber o "role" (aluno/professor/admin/
+// miniadmin) da pessoa — ver App.tsx e useAuth.ts.
+//
+// ⚠️ 
+// Este fluxo NÃO define nenhum "role" ao criar o perfil (repara que os 3
+// setDoc abaixo não têm o campo "role"). Isto é diferente do que acontece
+// quando um admin cria uma conta pelo AdminDashboard (esse sim já define
+// o role logo de início). Ou seja: quem se regista sozinho por aqui fica
+// "sem role" até alguém (um admin) lhe atribuir um manualmente. Se
+// pedirem para mudar isto (ex: "todos os que se registam devem ser
+// alunos por defeito"), é só acrescentar `role: 'aluno',` dentro de cada
+// um dos 3 objectos passados ao setDoc.
+// ═══════════════════════════════════════════════════════════════════════════
+
 import { useState } from 'react';
 import { ChickenMascot } from './ChickenMascot';
 import { Sparkles, Lock, Mail, Eye, EyeOff, Chrome, Github, ArrowRight } from 'lucide-react';
@@ -18,26 +43,30 @@ import { db } from '../../firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 interface LoginProps {
-  onLogin: () => void;
+  onLogin: () => void; // chamado pelo pai (App.tsx) depois de um login bem-sucedido — normalmente faz navigate("/")
 }
 
 export function Login({ onLogin }: LoginProps) {
+  // Campos do formulário de email/password
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false); // alterna o input entre type="password" e type="text"
+  const [isLoading, setIsLoading] = useState(false);       // desativa o botão + mostra "Processando..." enquanto aguarda o Firebase
 
-  // MODALS
-  const [openForgot, setOpenForgot] = useState(false);
-  const [openSignUp, setOpenSignUp] = useState(false);
+  // Controla a abertura dos 2 modais auxiliares (definidos noutros ficheiros)
+  const [openForgot, setOpenForgot] = useState(false); // "Esqueceu a password?" → ForgotPasswordModal.tsx
+  const [openSignUp, setOpenSignUp] = useState(false); // "Criar conta gratuita"  → SignUpModal.tsx (tem os Termos e Condições)
 
+  // ── Login por email/password ────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault(); // impede o refresh da página que um <form> faria por defeito
     setIsLoading(true);
     try {
+      // 1) Autentica no Firebase Auth
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
+      // 2) Garante que existe perfil no Firestore (cria se for a 1ª vez)
       const userRef = doc(db, "users", user.uid);
       const userSnap = await getDoc(userRef);
 
@@ -45,20 +74,31 @@ export function Login({ onLogin }: LoginProps) {
         await setDoc(userRef, {
           uid: user.uid,
           email: user.email,
-          name: user.email?.split("@")[0],
+          name: user.email?.split("@")[0], // usa a parte antes do "@" como nome por defeito
           photo: "",
           createdAt: new Date()
+          // ⚠️ sem "role" — ver aviso no topo do ficheiro
         });
       }
       setEmail('');
       setPassword('');
-      onLogin();
+      onLogin(); // avisa o App.tsx que pode navegar para a home
     } catch (error: any) {
+      // Se a password estiver errada, o email não existir, etc., o Firebase
+      // devolve error.message já em texto legível (embora em inglês) — por
+      // isso o alert() aqui é suficiente sem tratamento extra de erro.
       alert(error.message);
     }
     setIsLoading(false);
   };
 
+  // ── Login via Google (popup) ────────────────────────────────────────────
+  // Mesma lógica do handleSubmit, mas a autenticação vem de um popup do
+  // Google em vez de um formulário. Se pedirem para trocar "popup" por
+  // "redirect" (útil em Safari/iOS, que às vezes bloqueia popups), troca
+  // signInWithPopup por signInWithRedirect — mas atenção que o fluxo de
+  // redirect é assíncrono de forma diferente (usa getRedirectResult no
+  // arranque da app, não devolve o resultado aqui directamente).
   const handleGoogleLogin = async () => {
     try {
       const provider = new GoogleAuthProvider();
@@ -72,8 +112,8 @@ export function Login({ onLogin }: LoginProps) {
         await setDoc(userRef, {
           uid: user.uid,
           email: user.email,
-          name: user.displayName || user.email?.split("@")[0],
-          photo: user.photoURL || "",
+          name: user.displayName || user.email?.split("@")[0], // Google já dá o nome completo (displayName)
+          photo: user.photoURL || "",                            // e uma foto de perfil, ao contrário do email/password
           createdAt: new Date()
         });
       }
@@ -83,6 +123,12 @@ export function Login({ onLogin }: LoginProps) {
     }
   };
 
+  // ── Login via GitHub (popup) ─────────────────────────────────────────────
+  // Idêntico ao Google, só muda o provider. Se pedirem para adicionar mais
+  // um provider (ex: Microsoft, Apple), o padrão é sempre o mesmo: importar
+  // o *AuthProvider certo de 'firebase/auth', instanciar, e chamar
+  // signInWithPopup(auth, provider) — copia um destes 2 blocos e troca o
+  // provider.
   const handleGithubLogin = async () => {
     try {
       const provider = new GithubAuthProvider();
@@ -110,6 +156,7 @@ export function Login({ onLogin }: LoginProps) {
   return (
     <div className="min-h-screen bg-[#050208] text-white relative flex items-center justify-center px-4 overflow-hidden font-sans">
       
+      {/* Fundo decorativo (gradiente + grelha + blobs desfocados) — puramente visual, sem lógica */}
       <div className="fixed inset-0 z-0">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,#1a0b2e_0%,#050208_100%)]" />
         <div className="absolute inset-0 opacity-20 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:40px_40px]" />
@@ -120,6 +167,7 @@ export function Login({ onLogin }: LoginProps) {
       <div className="relative z-10 w-full max-w-6xl py-12">
         <div className="grid lg:grid-cols-2 gap-16 items-center">
 
+          {/* Coluna esquerda (só desktop): mascote + texto de boas-vindas */}
           <div className="hidden lg:flex flex-col justify-center items-center text-center space-y-8">
             <div className="relative transform hover:scale-105 transition-transform duration-700">
                 <div className="absolute inset-0 bg-purple-500/20 blur-[80px] rounded-full" />
@@ -139,6 +187,7 @@ export function Login({ onLogin }: LoginProps) {
             </div>
           </div>
 
+          {/* Coluna direita: o formulário em si */}
           <div className="w-full max-w-md mx-auto lg:mx-0">
             <div className="relative group">
               <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 to-fuchsia-600 rounded-[2rem] blur opacity-20 group-hover:opacity-40 transition duration-1000 group-hover:duration-200" />
@@ -157,6 +206,7 @@ export function Login({ onLogin }: LoginProps) {
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-5">
+                  {/* Campo email */}
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-purple-300 uppercase tracking-widest ml-1">E-mail</label>
                     <div className="relative group/input">
@@ -172,6 +222,7 @@ export function Login({ onLogin }: LoginProps) {
                     </div>
                   </div>
 
+                  {/* Campo password, com toggle de mostrar/esconder e link "Esqueceu?" */}
                   <div className="space-y-2">
                     <div className="flex justify-between items-center px-1">
                       <label className="text-xs font-bold text-purple-300 uppercase tracking-widest">Senha</label>
@@ -203,6 +254,7 @@ export function Login({ onLogin }: LoginProps) {
                     </div>
                   </div>
 
+                  {/* Botão de submeter — disabled enquanto isLoading, para não disparar 2 pedidos por duplo-clique */}
                   <button
                     type="submit"
                     disabled={isLoading}
@@ -221,6 +273,7 @@ export function Login({ onLogin }: LoginProps) {
                   <span className="relative px-4 bg-[#0d0616] text-[10px] font-bold uppercase tracking-[0.2em] text-white/20">Ou continuar com</span>
                 </div>
 
+                {/* Botões de login social — cada um chama o seu handler acima */}
                 <div className="grid grid-cols-2 gap-4">
                   <button
                     onClick={handleGoogleLogin}
@@ -239,6 +292,7 @@ export function Login({ onLogin }: LoginProps) {
                   </button>
                 </div>
 
+                {/* Link para abrir o SignUpModal (registo com Termos e Condições) */}
                 <div className="mt-10 text-center">
                    <p className="text-sm text-white/40">
                     Ainda não tem acesso?{" "}
@@ -264,6 +318,7 @@ export function Login({ onLogin }: LoginProps) {
         </div>
       </div>
 
+      {/* Os 2 modais controlados pelos states openForgot / openSignUp acima */}
       <ForgotPasswordModal
         isOpen={openForgot}
         onClose={() => setOpenForgot(false)}
