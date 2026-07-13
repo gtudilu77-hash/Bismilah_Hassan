@@ -8,7 +8,7 @@ import {
   Volume2, VolumeX, CheckCircle2, BookOpen, Brain, ListChecks,
   ChevronRight, ChevronLeft, X, RotateCcw, Trophy, Sparkles,
   GraduationCap, Clock, Star, Plus, PanelLeftClose, PanelLeftOpen,
-  Menu, FileText, Download, Copy, Check
+  Menu, FileText, Download, Copy, Check, Loader2
 } from 'lucide-react';
 import { db, auth } from "../../firebase";
 import { onAuthStateChanged } from "firebase/auth";
@@ -250,10 +250,88 @@ function MarkdownMessage({ text, t }: { text: string; t: any }) {
   );
 }
 
+// ─── Leitura real do conteúdo da matéria ──────────────────────────────────────
+// Antes, "Perguntar à IA sobre isto" só enviava o título da matéria — a IA
+// respondia com o que sabia sobre esse tema, sem nunca ver o documento em
+// si. Estas funções extraem o texto real do ficheiro (PDF ou texto simples)
+// para ser enviado como contexto à IA, para responder com base no
+// conteúdo verdadeiro, não numa suposição a partir do título.
+
+// Decodifica um data URI base64 de texto simples (ex: ficheiros .txt/.md)
+function extractPlainText(dataUri: string): string {
+  try {
+    const base64 = dataUri.split(',')[1] || '';
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return new TextDecoder('utf-8').decode(bytes);
+  } catch {
+    return '';
+  }
+}
+
+// Extrai o texto de um PDF (data URI base64) usando pdf.js.
+// O import é dinâmico (lazy) para não engordar o bundle inicial da app com
+// uma biblioteca só usada quando alguém realmente abre um PDF no chat.
+async function extractPdfText(dataUri: string): Promise<string> {
+  const pdfjsLib: any = await import('pdfjs-dist');
+  // Worker carregado via CDN, na mesma versão da biblioteca instalada —
+  // evita problemas de empacotamento do worker com o Vite.
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+
+  const base64 = dataUri.split(',')[1] || '';
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+
+  const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
+  let text = '';
+  const maxPages = Math.min(pdf.numPages, 30); // limite de segurança para documentos muito extensos
+  for (let i = 1; i <= maxPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    text += content.items.map((item: any) => ('str' in item ? item.str : '')).join(' ') + '\n\n';
+  }
+  return text;
+}
+
+/** Extrai o conteúdo textual de uma matéria, consoante o seu tipo MIME.
+ *  Devolve null se não conseguir extrair texto (ex: imagem, vídeo, tipo
+ *  desconhecido) — nesse caso a IA continua a responder só com base no
+ *  título/descrição, tal como acontecia antes desta alteração. */
+async function extractDocumentText(arquivoUrl: string, tipo?: string): Promise<string | null> {
+  if (!arquivoUrl || !tipo) return null;
+  try {
+    if (tipo === 'application/pdf') {
+      const text = await extractPdfText(arquivoUrl);
+      return text.trim() ? text.slice(0, 12000) : null; // limite de caracteres, para não sobrecarregar o contexto do modelo
+    }
+    if (tipo.startsWith('text/')) {
+      const text = extractPlainText(arquivoUrl);
+      return text.trim() ? text.slice(0, 12000) : null;
+    }
+  } catch (err) {
+    console.error('Erro ao extrair texto do documento:', err);
+  }
+  return null;
+}
+
 // ─── Material (Document Reader) Panel ─────────────────────────────────────────
-function MaterialPanel({ t, materia, onAskIA, isMobile }: {
-  t: any; materia: StudyMaterial | null; onAskIA: (text: string) => void; isMobile?: boolean;
+function MaterialPanel({ t, materia, onAskIA, onContextReady, isMobile }: {
+  t: any; materia: StudyMaterial | null; onAskIA: (text: string) => void; onContextReady: (context: string | null) => void; isMobile?: boolean;
 }) {
+  const [extracting, setExtracting] = useState(false);
+
+  const handleAskAboutThis = async () => {
+    if (!materia) return;
+    onAskIA(`Explique detalhadamente: ${materia.titulo}`);
+    setExtracting(true);
+    const context = await extractDocumentText(materia.arquivoUrl || '', materia.tipo);
+    onContextReady(context);
+    setExtracting(false);
+  };
+
   if (!materia) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: isMobile ? 16 : 20 }}>
@@ -311,10 +389,12 @@ function MaterialPanel({ t, materia, onAskIA, isMobile }: {
       </div>
 
       <button
-        onClick={() => onAskIA(`Explique detalhadamente: ${materia.titulo}`)}
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: isMobile ? 11 : 12, borderRadius: 18, cursor: 'pointer', background: `linear-gradient(135deg,${t.accent},${t.accentB})`, border: 'none', color: '#000', fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.15em', boxShadow: t.btnGlow, flexShrink: 0 }}
+        onClick={handleAskAboutThis}
+        disabled={extracting}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: isMobile ? 11 : 12, borderRadius: 18, cursor: extracting ? 'not-allowed' : 'pointer', background: `linear-gradient(135deg,${t.accent},${t.accentB})`, border: 'none', color: '#000', fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.15em', boxShadow: t.btnGlow, flexShrink: 0, opacity: extracting ? 0.7 : 1 }}
       >
-        <Sparkles size={13} /> Perguntar à IA sobre isto
+        {extracting ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Sparkles size={13} />}
+        {extracting ? 'A ler o documento...' : 'Perguntar à IA sobre isto'}
       </button>
     </div>
   );
@@ -660,6 +740,10 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
   const [topics,        setTopics]        = useState<Topic[]>([]);
   const [activeMaterial, setActiveMaterial] = useState<StudyMaterial | null>(null);
+  // Texto extraído do documento aberto, guardado aqui até à próxima
+  // mensagem ser enviada — nunca é mostrado no chat, só enriquece o que é
+  // realmente enviado à IA (ver handleSend).
+  const [pendingContext, setPendingContext] = useState<string | null>(null);
   const [toolLoading,   setToolLoading]   = useState<SidePanelMode>('none');
   const [hoveredMsg,    setHoveredMsg]    = useState<string | null>(null);
   const [sidebarOpen,   setSidebarOpen]   = useState(true);
@@ -784,7 +868,8 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
     const user = auth.currentUser; if (!user) return;
     const textToSend = inputValue || `Anexo: ${preview?.file.name}`;
     const cp = preview;
-    setInputValue(''); setPreview(null); setIsTyping(true);
+    const contextForAI = pendingContext; // captura antes de limpar — só se aplica a este envio
+    setInputValue(''); setPreview(null); setPendingContext(null); setIsTyping(true);
     if (isMobile) setSidebarOpen(false);
     try {
       let chatId = currentChatId;
@@ -803,8 +888,16 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
         await addDoc(collection(db, "chats", chatId, "messages"), { text: cp.file.name, sender: 'user', file: cp.url, fileType: cp.type, timestamp: serverTimestamp() });
         reply = ((await (await fetch(`${API}/api/${ep}`, { method: "POST", body: fd })).json()).result) || '';
       } else {
+        // O que fica gravado/mostrado no chat é sempre o texto limpo
+        // (textToSend). O que é enviado à IA pode ser maior — se houver um
+        // documento lido (contextForAI), o conteúdo real do ficheiro vai
+        // incluído no pedido, para a resposta ser sobre o documento a
+        // sério, não uma suposição a partir do título.
         await addDoc(collection(db, "chats", chatId, "messages"), { text: textToSend, sender: 'user', timestamp: serverTimestamp() });
-        reply = (await (await fetch(`${API}/api/chat`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: textToSend, userId: user.uid }) })).json()).reply;
+        const messageForAI = contextForAI
+          ? `Segue o conteúdo do documento da matéria — usa-o para responder com precisão, em vez de assumires pelo título:\n"""\n${contextForAI}\n"""\n\nPedido do aluno: ${textToSend}`
+          : textToSend;
+        reply = (await (await fetch(`${API}/api/chat`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: messageForAI, userId: user.uid }) })).json()).reply;
       }
       await addDoc(collection(db, "chats", chatId, "messages"), { text: reply, sender: 'ai', timestamp: serverTimestamp() });
       speak(reply);
@@ -1065,6 +1158,7 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
                   t={t}
                   materia={activeMaterial}
                   onAskIA={(text) => { setInputValue(text); textareaRef.current?.focus(); }}
+                  onContextReady={setPendingContext}
                   isMobile={isMobile}
                 />
               )}
@@ -1187,6 +1281,13 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
             </div>
           )}
 
+          {pendingContext && (
+            <div style={{ marginBottom: 8, padding: '7px 14px', borderRadius: 14, background: t.accentDim, border: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', gap: 8, maxWidth: isMobile ? '100%' : 640, margin: `0 auto 8px` }}>
+              <FileText size={12} style={{ color: t.accent, flexShrink: 0 }} />
+              <p style={{ margin: 0, fontSize: 10, color: t.accent, fontWeight: 700 }}>A IA vai ler o conteúdo do documento nesta resposta</p>
+            </div>
+          )}
+
           <div style={{ maxWidth: isMobile ? '100%' : 640, margin: '0 auto', position: 'relative' }}>
             <div style={{ position: 'absolute', inset: -1, borderRadius: isMobile ? 22 : 28, background: `linear-gradient(135deg,${t.accent}25,${t.accentB}15)`, filter: 'blur(6px)', pointerEvents: 'none', animation: 'glowPulse 3s ease-in-out infinite' }} />
             <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-end', gap: isMobile ? 4 : 6, padding: isMobile ? '6px 6px 6px 10px' : '8px 8px 8px 12px', borderRadius: isMobile ? 22 : 28, background: 'rgba(6,4,12,0.9)', border: `1px solid ${t.border}`, backdropFilter: 'blur(32px)' }}>
@@ -1226,6 +1327,7 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
 
       <style>{`
         @keyframes cloudDrift    { from{transform:translateX(0)} to{transform:translateX(115vw)} }
+        @keyframes spin          { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
         @keyframes typingBounce  { 0%,100%{transform:translateY(0);opacity:0.4} 50%{transform:translateY(-5px);opacity:1} }
         @keyframes glowPulse     { 0%,100%{opacity:0.5} 50%{opacity:0.9} }
         @keyframes linePulse     { 0%,100%{opacity:0.4} 50%{opacity:1} }
