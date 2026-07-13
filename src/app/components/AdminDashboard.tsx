@@ -287,28 +287,52 @@ export default function AdminDashboard() {
   const [drawerContact, setDrawerContact] = useState<Contact | null>(null);
 
   useEffect(() => {
-    const unsubMyRole = onAuthStateChanged(auth, (u) => {
-      if (!u) { setMyRole(null); return; }
-      getDoc(doc(db, "users", u.uid)).then(snap => {
-        setMyRole(snap.exists() ? (snap.data().role || null) : null);
-      }).catch(err => console.error(err));
+    // users é sempre subscrito — tanto admin como mini-admin precisam de o
+    // ver (regra: allow read: if isSignedIn(), cobre os dois).
+    const unsubUsers = onSnapshot(
+      query(collection(db, "users")),
+      snap => setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })) as UserProfile[]),
+      err => console.error(err)
+    );
+
+    // messages / contacts / chats (todas) só são lidos depois de sabermos
+    // o role, e só se for admin completo — um mini-admin não tem
+    // permissão para estas colecções nas firestore.rules, e tentar lê-las
+    // na mesma provocava um permission-denied que travava o dashboard.
+    let unsubExtra: (() => void)[] = [];
+
+    const unsubAuth = onAuthStateChanged(auth, async (u) => {
+      unsubExtra.forEach(fn => fn());
+      unsubExtra = [];
+
+      if (!u) { setMyRole(null); setLoading(false); return; }
+
+      let role: string | null = null;
+      try {
+        const snap = await getDoc(doc(db, "users", u.uid));
+        role = snap.exists() ? (snap.data().role || null) : null;
+      } catch (err) { console.error(err); }
+      setMyRole(role);
+
+      if (role === 'admin') {
+        const qMsg  = query(collection(db, "messages"), orderBy("timestamp", "desc"), limit(50));
+        // ✅ FIX: os formulários de contacto (Contact.tsx / TeacherDashboard.tsx)
+        // gravam o campo "createdAt", não "timestamp". Um orderBy num campo que
+        // os documentos não têm faz o Firestore devolver a coleção vazia.
+        const qCont = query(collection(db, "contacts"), orderBy("createdAt", "desc"), limit(50));
+        const qChat = query(collection(db, "chats"),    orderBy("createdAt",  "desc"), limit(100));
+
+        unsubExtra.push(
+          onSnapshot(qMsg,  snap => { setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })) as Message[]); setLoading(false); }, err => { setError("Erro: Neural Feed"); setLoading(false); }),
+          onSnapshot(qCont, snap => setContacts(snap.docs.map(d => ({ id: d.id, ...d.data() })) as Contact[]),        err => console.error(err)),
+          onSnapshot(qChat, snap => setChatRooms(snap.docs.map(d => ({ id: d.id, ...d.data() })) as ChatRoom[]),      err => console.error(err)),
+        );
+      } else {
+        // Mini-admin: sem estas 3 colecções, não há "loading" pendente
+        setLoading(false);
+      }
     });
-
-    const qMsg  = query(collection(db, "messages"), orderBy("timestamp", "desc"), limit(50));
-    // ✅ FIX: os formulários de contacto (Contact.tsx / TeacherDashboard.tsx)
-    // gravam o campo "createdAt", não "timestamp". Um orderBy num campo que
-    // os documentos não têm faz o Firestore devolver a coleção vazia.
-    const qCont = query(collection(db, "contacts"), orderBy("createdAt", "desc"), limit(50));
-    const qChat = query(collection(db, "chats"),    orderBy("createdAt",  "desc"), limit(100));
-    const qUser = query(collection(db, "users"));
-
-    const unsubs = [
-      onSnapshot(qMsg,  snap => { setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })) as Message[]); setLoading(false); }, err => { setError("Erro: Neural Feed"); setLoading(false); }),
-      onSnapshot(qCont, snap => setContacts(snap.docs.map(d => ({ id: d.id, ...d.data() })) as Contact[]),        err => console.error(err)),
-      onSnapshot(qChat, snap => setChatRooms(snap.docs.map(d => ({ id: d.id, ...d.data() })) as ChatRoom[]),      err => console.error(err)),
-      onSnapshot(qUser, snap => setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })) as UserProfile[]),       err => console.error(err)),
-    ];
-    return () => { unsubMyRole(); unsubs.forEach(u => u()); }
+    return () => { unsubUsers(); unsubAuth(); unsubExtra.forEach(fn => fn()); }
   }, []);
 
   const handleLogout = async () => { try { await signOut(auth); navigate("/login"); } catch {} };
@@ -395,17 +419,27 @@ export default function AdminDashboard() {
   };
 
   // Filtered data
-  const filteredUsers    = users.filter(u => (u.email + (u.name || '') + u.role).toLowerCase().includes(search.toLowerCase()));
+  const filteredUsers    = users
+    .filter(u => (u.email + (u.name || '') + u.role).toLowerCase().includes(search.toLowerCase()))
+    // Mini-admin só gere aluno/professor — não vê contas admin/mini-admin
+    .filter(u => myRole === 'admin' || u.role === 'aluno' || u.role === 'professor');
   const filteredContacts = contacts.filter(c => (c.name + c.email + c.message).toLowerCase().includes(search.toLowerCase()));
   const filteredChats    = chatRooms.filter(c => (c.title || '').toLowerCase().includes(search.toLowerCase()));
   const filteredMessages = messages.filter(m => (m.text + m.sender).toLowerCase().includes(search.toLowerCase()));
 
-  const NAV: { id: Tab; icon: any; label: string }[] = [
-    { id: 'overview',  icon: BarChart2,      label: 'Overview'   },
-    { id: 'messages',  icon: MessageSquare,  label: 'Mensagens'  },
-    { id: 'contacts',  icon: Inbox,          label: 'Contatos'   },
-    { id: 'users',     icon: Users,          label: 'Utilizadores'},
-  ];
+  const NAV: { id: Tab; icon: any; label: string }[] = myRole === 'miniadmin'
+    ? [{ id: 'users', icon: Users, label: 'Utilizadores' }]
+    : [
+        { id: 'overview',  icon: BarChart2,      label: 'Overview'   },
+        { id: 'messages',  icon: MessageSquare,  label: 'Mensagens'  },
+        { id: 'contacts',  icon: Inbox,          label: 'Contatos'   },
+        { id: 'users',     icon: Users,          label: 'Utilizadores'},
+      ];
+
+  // Mini-admin nunca deve ficar preso numa aba a que não tem acesso
+  useEffect(() => {
+    if (myRole === 'miniadmin' && activeTab !== 'users') setActiveTab('users');
+  }, [myRole, activeTab]);
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#050208', color: '#fff', display: 'flex', overflow: 'hidden', fontFamily: "'Sora','DM Sans',sans-serif" }}>
@@ -450,11 +484,14 @@ export default function AdminDashboard() {
           </button>
         </nav>
 
-        {/* Interceptions counter */}
-        <div style={{ margin: '0 12px 16px', padding: '18px 20px', borderRadius: 20, background: 'linear-gradient(135deg, rgba(168,85,247,0.15), rgba(217,70,239,0.08))', border: '1px solid rgba(168,85,247,0.2)' }}>
-          <p style={{ fontSize: 8, fontWeight: 900, color: 'rgba(168,85,247,0.7)', textTransform: 'uppercase', letterSpacing: '0.3em', margin: '0 0 6px' }}>Interceptions</p>
-          <p style={{ fontSize: 36, fontWeight: 900, fontStyle: 'italic', letterSpacing: '-0.03em', margin: 0, color: '#fff' }}>{messages.length + contacts.length}</p>
-        </div>
+        {/* Interceptions counter — só faz sentido para admin completo,
+            que tem acesso a mensagens e contactos */}
+        {myRole === 'admin' && (
+          <div style={{ margin: '0 12px 16px', padding: '18px 20px', borderRadius: 20, background: 'linear-gradient(135deg, rgba(168,85,247,0.15), rgba(217,70,239,0.08))', border: '1px solid rgba(168,85,247,0.2)' }}>
+            <p style={{ fontSize: 8, fontWeight: 900, color: 'rgba(168,85,247,0.7)', textTransform: 'uppercase', letterSpacing: '0.3em', margin: '0 0 6px' }}>Interceptions</p>
+            <p style={{ fontSize: 36, fontWeight: 900, fontStyle: 'italic', letterSpacing: '-0.03em', margin: 0, color: '#fff' }}>{messages.length + contacts.length}</p>
+          </div>
+        )}
       </aside>
 
       {/* ── MAIN ── */}
@@ -463,7 +500,7 @@ export default function AdminDashboard() {
         {/* Header */}
         <div style={{ padding: '28px 36px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <div>
-            <p style={{ fontSize: 9, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.4em', color: 'rgba(168,85,247,0.6)', margin: '0 0 4px' }}>Admin Panel</p>
+            <p style={{ fontSize: 9, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.4em', color: 'rgba(168,85,247,0.6)', margin: '0 0 4px' }}>{myRole === 'miniadmin' ? 'Mini-Admin Panel' : 'Admin Panel'}</p>
             <h2 style={{ fontSize: 28, fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', letterSpacing: '-0.02em', margin: 0 }}>
               {activeTab === 'overview' ? 'Overview' : activeTab === 'messages' ? 'Mensagens' : activeTab === 'contacts' ? 'Contatos' : 'Utilizadores'}
             </h2>
