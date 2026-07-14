@@ -2,12 +2,16 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ── Helpers ──────────────────────────────────────────────────────────
     function isSignedIn() {
       return request.auth != null;
     }
     function isOwner(uid) {
       return isSignedIn() && request.auth.uid == uid;
     }
+    // Lê o próprio perfil para descobrir o role. Chamadas get()/exists()
+    // dentro das regras não estão sujeitas às regras (é o mecanismo
+    // suportado para decisões de autorização baseadas noutro documento).
     function myRole() {
       return isSignedIn()
         ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
@@ -23,6 +27,7 @@ service cloud.firestore {
       return myRole() == 'professor';
     }
 
+    // ── users ────────────────────────────────────────────────────────────
     match /users/{userId} {
       allow read: if isSignedIn();
 
@@ -40,11 +45,13 @@ service cloud.firestore {
         || (isMiniAdmin() && resource.data.role in ['aluno', 'professor']);
     }
 
+    // ── materias ─────────────────────────────────────────────────────────
     match /materias/{materiaId} {
       allow read: if isSignedIn();
       allow write: if isProfessor() || isAdmin();
     }
 
+    // ── chats ────────────────────────────────────────────────────────────
     match /chats/{chatId} {
       allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
@@ -58,15 +65,23 @@ service cloud.firestore {
       }
     }
 
+    // ── studentStats ─────────────────────────────────────────────────────
     match /studentStats/{uid} {
       allow read, write: if isOwner(uid);
     }
 
+    // ── usageLimits ──────────────────────────────────────────────────────
+    match /usageLimits/{uid} {
+      allow read, write: if isOwner(uid);
+    }
+
+    // ── contacts ─────────────────────────────────────────────────────────
     match /contacts/{contactId} {
       allow create: if isSignedIn();
       allow read, update, delete: if isAdmin();
     }
 
+    // ── messages (feed legado / Neural Feed do AdminDashboard) ──────────
     match /messages/{messageId} {
       allow read: if isAdmin();
       allow write: if isSignedIn();
