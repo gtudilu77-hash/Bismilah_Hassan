@@ -401,8 +401,9 @@ function MaterialPanel({ t, materia, onAskIA, onContextReady, isMobile }: {
 }
 
 // ─── Flashcard Panel ──────────────────────────────────────────────────────────
-function FlashcardPanel({ t, onGenerate, cards, isLoading, isMobile }: {
+function FlashcardPanel({ t, onGenerate, cards, isLoading, isMobile, limitInfo }: {
   t: any; onGenerate: () => void; cards: Flashcard[]; isLoading: boolean; isMobile?: boolean;
+  limitInfo?: { remaining: number; message?: string } | null; // null/undefined = sem limite (aluno/professor)
 }) {
   const [idx, setIdx]   = useState(0);
   const [flip, setFlip] = useState(false);
@@ -415,6 +416,7 @@ function FlashcardPanel({ t, onGenerate, cards, isLoading, isMobile }: {
 
   const cardH = isMobile ? 160 : 200;
   const pad   = isMobile ? '16px' : '20px';
+  const blocked = !!limitInfo && limitInfo.remaining <= 0;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: pad, gap: isMobile ? 12 : 16 }}>
@@ -422,11 +424,16 @@ function FlashcardPanel({ t, onGenerate, cards, isLoading, isMobile }: {
         <div>
           <p style={{ fontSize: 9, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.4em', color: `${t.accent}66`, margin: 0 }}>Flashcards</p>
           {cards.length > 0 && <p style={{ fontSize: 11, color: t.accent, margin: '4px 0 0', fontWeight: 700 }}>{idx + 1}<span style={{ opacity: 0.4 }}>/{cards.length}</span></p>}
+          {limitInfo && <p style={{ fontSize: 9, color: blocked ? '#f87171' : `${t.accent}80`, margin: '4px 0 0', fontWeight: 700 }}>{limitInfo.remaining}/{LIMIT_PER_DAY} hoje</p>}
         </div>
-        <button onClick={onGenerate} disabled={isLoading} className="tool-btn" style={{ '--ac': t.accent, '--acd': t.accentDim, '--acb': t.border } as any}>
+        <button onClick={onGenerate} disabled={isLoading || blocked} className="tool-btn" style={{ '--ac': t.accent, '--acd': t.accentDim, '--acb': t.border } as any}>
           <Sparkles size={9} /> {isLoading ? 'Gerando...' : 'Gerar'}
         </button>
       </div>
+
+      {blocked && limitInfo?.message && (
+        <p style={{ fontSize: 11, color: '#f87171', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 14, padding: '10px 14px', margin: 0 }}>{limitInfo.message}</p>
+      )}
 
       {cards.length > 0 && (
         <div style={{ height: 3, borderRadius: 99, background: `${t.accent}18`, overflow: 'hidden' }}>
@@ -443,7 +450,7 @@ function FlashcardPanel({ t, onGenerate, cards, isLoading, isMobile }: {
             <p style={{ color: `rgba(255,255,255,0.5)`, fontSize: 12, maxWidth: 220, lineHeight: 1.6, margin: '0 0 6px', fontWeight: 600 }}>Nenhum flashcard ainda</p>
             <p style={{ color: `${t.accent}50`, fontSize: 11, maxWidth: 220, lineHeight: 1.6, margin: 0 }}>Clica em "Gerar" para criar flashcards da conversa</p>
           </div>
-          <button onClick={onGenerate} disabled={isLoading} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 24px', borderRadius: 20, cursor: 'pointer', background: `linear-gradient(135deg,${t.accent},${t.accentB})`, border: 'none', color: '#000', fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.15em', boxShadow: t.btnGlow }}>
+          <button onClick={onGenerate} disabled={isLoading || blocked} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 24px', borderRadius: 20, cursor: blocked ? 'not-allowed' : 'pointer', background: blocked ? 'rgba(255,255,255,0.06)' : `linear-gradient(135deg,${t.accent},${t.accentB})`, border: 'none', color: blocked ? 'rgba(255,255,255,0.3)' : '#000', fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.15em', boxShadow: blocked ? 'none' : t.btnGlow }}>
             <Sparkles size={13} /> {isLoading ? 'Gerando...' : 'Gerar Flashcards'}
           </button>
         </div>
@@ -476,10 +483,11 @@ function FlashcardPanel({ t, onGenerate, cards, isLoading, isMobile }: {
 }
 
 // ─── Quiz Panel ───────────────────────────────────────────────────────────────
-function QuizPanel({ t, onGenerate, questions, isLoading, isMobile, onComplete }: {
+function QuizPanel({ t, onGenerate, questions, isLoading, isMobile, onComplete, limitInfo }: {
   t: any; onGenerate: () => void; questions: QuizQuestion[];
   isLoading: boolean; isMobile?: boolean;
   onComplete?: (score: number, total: number, wrong: string[]) => void;
+  limitInfo?: { remaining: number; message?: string } | null;
 }) {
   const [idx, setIdx]         = useState(0);
   const [sel, setSel]         = useState<number | null>(null);
@@ -487,6 +495,7 @@ function QuizPanel({ t, onGenerate, questions, isLoading, isMobile, onComplete }
   const [done, setDone]       = useState(false);
   const [answers, setAnswers] = useState<number[]>([]);
   const [wrong, setWrong]     = useState<string[]>([]);   // ← rastreia perguntas erradas
+  const blocked = !!limitInfo && limitInfo.remaining <= 0;
 
   const reset = () => {
     setIdx(0); setSel(null); setScore(0);
@@ -527,12 +536,17 @@ function QuizPanel({ t, onGenerate, questions, isLoading, isMobile, onComplete }
         <div>
           <p style={{ fontSize: 9, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.4em', color: `${t.accent}66`, margin: 0 }}>Quiz</p>
           {!done && questions.length > 0 && <p style={{ fontSize: 11, color: t.accent, margin: '4px 0 0', fontWeight: 700 }}>{idx + 1}<span style={{ opacity: 0.4 }}>/{questions.length}</span></p>}
+          {limitInfo && <p style={{ fontSize: 9, color: blocked ? '#f87171' : `${t.accent}80`, margin: '4px 0 0', fontWeight: 700 }}>{limitInfo.remaining}/{LIMIT_PER_DAY} hoje</p>}
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           {done && <button onClick={reset} className="tool-btn" style={{ '--ac': t.accent, '--acd': t.accentDim, '--acb': t.border } as any}><RotateCcw size={9} /> Repetir</button>}
-          <button onClick={onGenerate} disabled={isLoading} className="tool-btn" style={{ '--ac': t.accent, '--acd': t.accentDim, '--acb': t.border } as any}><Sparkles size={9} /> {isLoading ? 'Gerando...' : 'Gerar'}</button>
+          <button onClick={onGenerate} disabled={isLoading || blocked} className="tool-btn" style={{ '--ac': t.accent, '--acd': t.accentDim, '--acb': t.border } as any}><Sparkles size={9} /> {isLoading ? 'Gerando...' : 'Gerar'}</button>
         </div>
       </div>
+
+      {blocked && limitInfo?.message && (
+        <p style={{ fontSize: 11, color: '#f87171', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 14, padding: '10px 14px', margin: 0 }}>{limitInfo.message}</p>
+      )}
 
       {questions.length === 0 ? (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, textAlign: 'center' }}>
@@ -541,7 +555,7 @@ function QuizPanel({ t, onGenerate, questions, isLoading, isMobile, onComplete }
             <p style={{ color: `rgba(255,255,255,0.5)`, fontSize: 12, maxWidth: 220, lineHeight: 1.6, margin: '0 0 6px', fontWeight: 600 }}>Nenhum quiz ainda</p>
             <p style={{ color: `${t.accent}50`, fontSize: 11, maxWidth: 220, lineHeight: 1.6, margin: 0 }}>Gera um quiz baseado na conversa</p>
           </div>
-          <button onClick={onGenerate} disabled={isLoading} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 24px', borderRadius: 20, cursor: 'pointer', background: `linear-gradient(135deg,${t.accent},${t.accentB})`, border: 'none', color: '#000', fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.15em', boxShadow: t.btnGlow }}>
+          <button onClick={onGenerate} disabled={isLoading || blocked} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 24px', borderRadius: 20, cursor: blocked ? 'not-allowed' : 'pointer', background: blocked ? 'rgba(255,255,255,0.06)' : `linear-gradient(135deg,${t.accent},${t.accentB})`, border: 'none', color: blocked ? 'rgba(255,255,255,0.3)' : '#000', fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.15em', boxShadow: blocked ? 'none' : t.btnGlow }}>
             <Sparkles size={13} /> {isLoading ? 'Gerando...' : 'Gerar Quiz'}
           </button>
         </div>
@@ -601,19 +615,25 @@ function QuizPanel({ t, onGenerate, questions, isLoading, isMobile, onComplete }
 }
 
 // ─── Organizer Panel ──────────────────────────────────────────────────────────
-function OrganizerPanel({ t, onGenerate, topics, isLoading, isMobile }: {
+function OrganizerPanel({ t, onGenerate, topics, isLoading, isMobile, limitInfo }: {
   t: any; onGenerate: () => void; topics: Topic[]; isLoading: boolean; isMobile?: boolean;
+  limitInfo?: { remaining: number; message?: string } | null;
 }) {
   const [expanded, setExpanded] = useState<number | null>(0);
+  const blocked = !!limitInfo && limitInfo.remaining <= 0;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', padding: isMobile ? 16 : 20, gap: isMobile ? 12 : 14 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <div>
           <p style={{ fontSize: 9, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.4em', color: `${t.accent}66`, margin: 0 }}>Tópicos</p>
           {topics.length > 0 && <p style={{ fontSize: 11, color: t.accent, margin: '4px 0 0', fontWeight: 700 }}>{topics.length} tópicos</p>}
+          {limitInfo && <p style={{ fontSize: 9, color: blocked ? '#f87171' : `${t.accent}80`, margin: '4px 0 0', fontWeight: 700 }}>{limitInfo.remaining}/{LIMIT_PER_DAY} hoje</p>}
         </div>
-        <button onClick={onGenerate} disabled={isLoading} className="tool-btn" style={{ '--ac': t.accent, '--acd': t.accentDim, '--acb': t.border } as any}><Sparkles size={9} /> {isLoading ? 'Organizando...' : 'Organizar'}</button>
+        <button onClick={onGenerate} disabled={isLoading || blocked} className="tool-btn" style={{ '--ac': t.accent, '--acd': t.accentDim, '--acb': t.border } as any}><Sparkles size={9} /> {isLoading ? 'Organizando...' : 'Organizar'}</button>
       </div>
+      {blocked && limitInfo?.message && (
+        <p style={{ fontSize: 11, color: '#f87171', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 14, padding: '10px 14px', margin: 0 }}>{limitInfo.message}</p>
+      )}
       {topics.length === 0 ? (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, textAlign: 'center' }}>
           <div style={{ width: 64, height: 64, borderRadius: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', background: t.accentDim, border: `1px solid ${t.border}` }}><ListChecks size={26} style={{ color: `${t.accent}60` }} /></div>
@@ -621,7 +641,7 @@ function OrganizerPanel({ t, onGenerate, topics, isLoading, isMobile }: {
             <p style={{ color: `rgba(255,255,255,0.5)`, fontSize: 12, maxWidth: 220, lineHeight: 1.6, margin: '0 0 6px', fontWeight: 600 }}>Nada organizado ainda</p>
             <p style={{ color: `${t.accent}50`, fontSize: 11, maxWidth: 220, lineHeight: 1.6, margin: 0 }}>Organiza a matéria em tópicos e subtópicos</p>
           </div>
-          <button onClick={onGenerate} disabled={isLoading} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 24px', borderRadius: 20, cursor: 'pointer', background: `linear-gradient(135deg,${t.accent},${t.accentB})`, border: 'none', color: '#000', fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.15em', boxShadow: t.btnGlow }}>
+          <button onClick={onGenerate} disabled={isLoading || blocked} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 24px', borderRadius: 20, cursor: blocked ? 'not-allowed' : 'pointer', background: blocked ? 'rgba(255,255,255,0.06)' : `linear-gradient(135deg,${t.accent},${t.accentB})`, border: 'none', color: blocked ? 'rgba(255,255,255,0.3)' : '#000', fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.15em', boxShadow: blocked ? 'none' : t.btnGlow }}>
             <Sparkles size={13} /> {isLoading ? 'Organizando...' : 'Organizar Matéria'}
           </button>
         </div>
@@ -678,6 +698,10 @@ function WelcomeScreen({ t, onChip, isMobile }: { t: any; onChip: (label: string
         <p style={{ fontSize: isMobile ? 12 : 14, color: 'rgba(255,255,255,0.3)', margin: 0, fontWeight: 400, maxWidth: 300, lineHeight: 1.6 }}>
           Escolhe uma sugestão ou escreve a tua pergunta abaixo
         </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 99, background: t.accentDim, border: `1px solid ${t.border}` }}>
+          <GraduationCap size={11} style={{ color: t.accent }} />
+          <span style={{ fontSize: 10, fontWeight: 700, color: `${t.accent}` }}>Apenas conteúdos académicos — fora disso, não respondo</span>
+        </div>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', maxWidth: 520 }}>
         {chips.map(({ icon: Icon, label }) => (
@@ -725,6 +749,18 @@ function useIsMobile(breakpoint = 768) {
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
+// ─── Limite diário de uso (flashcards / quiz / tópicos) ──────────────────────
+// Cada uma destas 3 ferramentas só pode ser gerada 5x por dia, por
+// utilizador. Guardado no Firestore (usageLimits/{uid}) para persistir
+// entre sessões/dispositivos, não só na memória da aba.
+const LIMIT_PER_DAY = 5;
+
+/** Data de hoje no formato YYYY-MM-DD, no fuso horário local do dispositivo
+ *  — usada para saber se o contador de um dia anterior deve ser "esquecido". */
+function todayKey(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterfaceProps) {
   const [messages,      setMessages]      = useState<Message[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
@@ -745,6 +781,12 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
   // realmente enviado à IA (ver handleSend).
   const [pendingContext, setPendingContext] = useState<string | null>(null);
   const [toolLoading,   setToolLoading]   = useState<SidePanelMode>('none');
+  // Limite diário de 5x para flashcards/quiz/tópicos — ver LIMIT_PER_DAY,
+  // consumeUsage() e o useEffect que subscreve usageLimits/{uid} mais abaixo.
+  const [usage, setUsage] = useState<{ date: string; flashcards: number; quiz: number; organizer: number }>({
+    date: todayKey(), flashcards: 0, quiz: 0, organizer: 0,
+  });
+  const [limitMessage, setLimitMessage] = useState<{ flashcards?: string; quiz?: string; organizer?: string }>({});
   const [hoveredMsg,    setHoveredMsg]    = useState<string | null>(null);
   const [sidebarOpen,   setSidebarOpen]   = useState(true);
 
@@ -813,6 +855,58 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
     });
     return () => { unsubAuth(); if (unsubChats) unsubChats(); };
   }, []);
+
+  // ── Limite diário (flashcards/quiz/tópicos) — só se aplica a "normal" ──────
+  // Aluno e professor não têm restrição nenhuma; só o utilizador comum
+  // (currentRole === 'normal') fica sujeito ao tecto de 5x/dia por ferramenta.
+  useEffect(() => {
+    let unsubUsage: (() => void) | null = null;
+    const unsubAuthUsage = onAuthStateChanged(auth, (u) => {
+      if (unsubUsage) { unsubUsage(); unsubUsage = null; }
+      if (!u) return;
+      unsubUsage = onSnapshot(doc(db, 'usageLimits', u.uid), (snap) => {
+        const today = todayKey();
+        if (snap.exists()) {
+          const d = snap.data() as any;
+          setUsage(d.date === today
+            ? { date: today, flashcards: d.flashcards || 0, quiz: d.quiz || 0, organizer: d.organizer || 0 }
+            : { date: today, flashcards: 0, quiz: 0, organizer: 0 }); // dia mudou — mostra tudo disponível (o reset real na BD só acontece no próximo uso)
+        } else {
+          setUsage({ date: today, flashcards: 0, quiz: 0, organizer: 0 });
+        }
+      }, err => console.error(err));
+    });
+    return () => { unsubAuthUsage(); if (unsubUsage) unsubUsage(); };
+  }, []);
+
+  /** Verifica e regista o uso de uma ferramenta com limite diário. Devolve
+   *  true se pode avançar, false se já atingiu o limite de hoje. Para
+   *  aluno/professor, devolve sempre true (sem limite nenhum). */
+  const consumeUsage = async (feature: 'flashcards' | 'quiz' | 'organizer'): Promise<boolean> => {
+    if (currentRole !== 'normal') return true; // só o utilizador comum tem limite
+    const u = auth.currentUser;
+    if (!u) return true;
+    try {
+      const ref = doc(db, 'usageLimits', u.uid);
+      const snap = await getDoc(ref);
+      const today = todayKey();
+      let current = { date: today, flashcards: 0, quiz: 0, organizer: 0 };
+      if (snap.exists()) {
+        const d = snap.data() as any;
+        if (d.date === today) {
+          current = { date: today, flashcards: d.flashcards || 0, quiz: d.quiz || 0, organizer: d.organizer || 0 };
+        }
+        // se o dia mudou, "current" já começa zerado — reset natural
+      }
+      if (current[feature] >= LIMIT_PER_DAY) return false;
+      current[feature] += 1;
+      await setDoc(ref, current); // substitui o documento inteiro de propósito, para o reset de dia ficar sempre correcto
+      return true;
+    } catch (err) {
+      console.error('Erro ao verificar limite de uso diário:', err);
+      return true; // falha de rede não deve bloquear o utilizador
+    }
+  };
 
   useEffect(() => {
     if (!currentChatId) {
@@ -916,18 +1010,24 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
   };
 
   const generateFlashcards = async () => {
+    const allowed = await consumeUsage('flashcards');
+    if (!allowed) { setLimitMessage(prev => ({ ...prev, flashcards: `Atingiste o limite de ${LIMIT_PER_DAY} flashcards por dia. Tenta novamente amanhã.` })); return; }
     setToolLoading('flashcards');
     try { setFlashcards((await callAI(`Gera 6 flashcards JSON: [{"front":"...","back":"..."}]. Conversa: ${getCtx()}. Só JSON.`)).map((f: any) => ({ ...f, mastered: false }))); } catch {}
     setToolLoading('none');
   };
 
   const generateQuiz = async () => {
+    const allowed = await consumeUsage('quiz');
+    if (!allowed) { setLimitMessage(prev => ({ ...prev, quiz: `Atingiste o limite de ${LIMIT_PER_DAY} quizzes por dia. Tenta novamente amanhã.` })); return; }
     setToolLoading('quiz');
     try { setQuizQuestions(await callAI(`Cria 5 perguntas JSON: [{"question":"...","options":["A","B","C","D"],"correct":0}]. Conversa: ${getCtx()}. Só JSON.`)); } catch {}
     setToolLoading('none');
   };
 
   const generateOrganizer = async () => {
+    const allowed = await consumeUsage('organizer');
+    if (!allowed) { setLimitMessage(prev => ({ ...prev, organizer: `Atingiste o limite de ${LIMIT_PER_DAY} organizações de tópicos por dia. Tenta novamente amanhã.` })); return; }
     setToolLoading('organizer');
     const colors = [t.accent, '#f59e0b', '#ec4899', '#06b6d4', '#84cc16'];
     try { setTopics((await callAI(`Organiza em tópicos JSON: [{"title":"...","subtopics":["..."]}]. Máx 5. Conversa: ${getCtx()}. Só JSON.`)).map((tp: any, i: number) => ({ ...tp, color: colors[i % colors.length] }))); } catch {}
@@ -1163,7 +1263,10 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
                 />
               )}
               {sidePanel === 'flashcards' && (
-                <FlashcardPanel t={t} cards={flashcards} onGenerate={generateFlashcards} isLoading={toolLoading === 'flashcards'} isMobile={isMobile} />
+                <FlashcardPanel
+                  t={t} cards={flashcards} onGenerate={generateFlashcards} isLoading={toolLoading === 'flashcards'} isMobile={isMobile}
+                  limitInfo={currentRole === 'normal' ? { remaining: Math.max(0, LIMIT_PER_DAY - usage.flashcards), message: limitMessage.flashcards } : null}
+                />
               )}
               {sidePanel === 'quiz' && (
                 <QuizPanel
@@ -1173,10 +1276,14 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
                   isLoading={toolLoading === 'quiz'}
                   isMobile={isMobile}
                   onComplete={handleQuizComplete}
+                  limitInfo={currentRole === 'normal' ? { remaining: Math.max(0, LIMIT_PER_DAY - usage.quiz), message: limitMessage.quiz } : null}
                 />
               )}
               {sidePanel === 'organizer' && (
-                <OrganizerPanel t={t} topics={topics} onGenerate={generateOrganizer} isLoading={toolLoading === 'organizer'} isMobile={isMobile} />
+                <OrganizerPanel
+                  t={t} topics={topics} onGenerate={generateOrganizer} isLoading={toolLoading === 'organizer'} isMobile={isMobile}
+                  limitInfo={currentRole === 'normal' ? { remaining: Math.max(0, LIMIT_PER_DAY - usage.organizer), message: limitMessage.organizer } : null}
+                />
               )}
             </div>
           </>
@@ -1315,7 +1422,7 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
               </button>
             </div>
             {!isMobile && (
-              <p style={{ textAlign: 'center', fontSize: 9, color: 'rgba(255,255,255,0.12)', marginTop: 8 }}>Enter para enviar · Shift+Enter para nova linha</p>
+              <p style={{ textAlign: 'center', fontSize: 9, color: 'rgba(255,255,255,0.12)', marginTop: 8 }}>Enter para enviar · Shift+Enter para nova linha · Apenas conteúdos académicos</p>
             )}
           </div>
         </div>
