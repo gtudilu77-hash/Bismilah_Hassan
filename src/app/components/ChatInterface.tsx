@@ -675,7 +675,7 @@ function OrganizerPanel({ t, onGenerate, topics, isLoading, isMobile, limitInfo 
 }
 
 // ─── Welcome Screen ───────────────────────────────────────────────────────────
-function WelcomeScreen({ t, onChip, isMobile }: { t: any; onChip: (label: string) => void; isMobile?: boolean }) {
+function WelcomeScreen({ t, onChip, isMobile, showAcademicNotice }: { t: any; onChip: (label: string) => void; isMobile?: boolean; showAcademicNotice?: boolean }) {
   const chips = [
     { icon: GraduationCap, label: 'Explicar um conceito' },
     { icon: ListChecks,    label: 'Resumir a matéria' },
@@ -698,10 +698,12 @@ function WelcomeScreen({ t, onChip, isMobile }: { t: any; onChip: (label: string
         <p style={{ fontSize: isMobile ? 12 : 14, color: 'rgba(255,255,255,0.3)', margin: 0, fontWeight: 400, maxWidth: 300, lineHeight: 1.6 }}>
           Escolhe uma sugestão ou escreve a tua pergunta abaixo
         </p>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 99, background: t.accentDim, border: `1px solid ${t.border}` }}>
-          <GraduationCap size={11} style={{ color: t.accent }} />
-          <span style={{ fontSize: 10, fontWeight: 700, color: `${t.accent}` }}>Apenas conteúdos académicos — fora disso, não respondo</span>
-        </div>
+        {showAcademicNotice && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 99, background: t.accentDim, border: `1px solid ${t.border}` }}>
+            <GraduationCap size={11} style={{ color: t.accent }} />
+            <span style={{ fontSize: 10, fontWeight: 700, color: `${t.accent}` }}>Apenas conteúdos académicos — fora disso, não respondo</span>
+          </div>
+        )}
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', maxWidth: 520 }}>
         {chips.map(({ icon: Icon, label }) => (
@@ -991,7 +993,7 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
         const messageForAI = contextForAI
           ? `Segue o conteúdo do documento da matéria — usa-o para responder com precisão, em vez de assumires pelo título:\n"""\n${contextForAI}\n"""\n\nPedido do aluno: ${textToSend}`
           : textToSend;
-        reply = (await (await fetch(`${API}/api/chat`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: messageForAI, userId: user.uid }) })).json()).reply;
+        reply = (await (await fetch(`${API}/api/chat`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: messageForAI, userId: user.uid, role: currentRole }) })).json()).reply;
       }
       await addDoc(collection(db, "chats", chatId, "messages"), { text: reply, sender: 'ai', timestamp: serverTimestamp() });
       speak(reply);
@@ -1313,7 +1315,7 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
         )}
 
         {showWelcome ? (
-          <WelcomeScreen t={t} onChip={setInputValue} isMobile={isMobile} />
+          <WelcomeScreen t={t} onChip={setInputValue} isMobile={isMobile} showAcademicNotice={currentRole === 'aluno'} />
         ) : (
           <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '16px 12px' : '24px 32px', display: 'flex', flexDirection: 'column', gap: isMobile ? 14 : 20 }} className="custom-scroll">
             {messages.map((msg, i) => (
@@ -1422,7 +1424,7 @@ export function ChatInterface({ onBack, isTeacher = false, role }: ChatInterface
               </button>
             </div>
             {!isMobile && (
-              <p style={{ textAlign: 'center', fontSize: 9, color: 'rgba(255,255,255,0.12)', marginTop: 8 }}>Enter para enviar · Shift+Enter para nova linha · Apenas conteúdos académicos</p>
+              <p style={{ textAlign: 'center', fontSize: 9, color: 'rgba(255,255,255,0.12)', marginTop: 8 }}>Enter para enviar · Shift+Enter para nova linha{currentRole === 'aluno' ? ' · Apenas conteúdos académicos' : ''}</p>
             )}
           </div>
         </div>

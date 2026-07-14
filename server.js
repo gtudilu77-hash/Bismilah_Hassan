@@ -96,8 +96,14 @@ REGRAS ABSOLUTAS:
 - Você é A.V.E.S. Ponto final.
 - O seu propósito é ajudar estudantes a aprender de forma eficaz.
 - Responde sempre em Português de Portugal ou Português de Angola, conforme o contexto.
+`.trim();
 
-LIMITE DE ÂMBITO — CONTEÚDO ACADÉMICO APENAS:
+// Instrução extra, só acrescentada ao prompt quando quem fala é um ALUNO
+// (ver /api/chat mais abaixo) — professor e utilizador comum não têm esta
+// restrição.
+const ALUNO_ACADEMIC_ONLY_INSTRUCTION = `
+
+LIMITE DE ÂMBITO — CONTEÚDO ACADÉMICO APENAS (só se aplica a alunos):
 - Só respondes a perguntas relacionadas com estudo, matérias escolares/académicas, explicações de conceitos, ajuda com trabalhos, dúvidas de disciplinas, organização de estudo, ou o próprio funcionamento do A.V.E.S.
 - Se a pergunta for sobre algo fora deste âmbito (ex: conversa pessoal não relacionada com estudo, entretenimento, política, desporto, fofocas, ou qualquer tema não-académico), recusa educadamente e traz a pessoa de volta ao propósito da plataforma. Exemplo de resposta nesse caso: "Sou focado em ajudar-te a estudar — não respondo a esse tipo de pergunta. Queres ajuda com alguma matéria ou trabalho?"
 - Não sejas rígido a ponto de recusar uma saudação simples ("olá", "bom dia") ou uma pergunta sobre ti próprio — a restrição é sobre o CONTEÚDO da resposta, não sobre seres simpático.
@@ -143,7 +149,7 @@ app.get("/health", (req, res) => res.json({ status: "ok" }));
 ========================= */
 app.post("/api/chat", async (req, res) => {
   try {
-    const { message, userId, mode = "normal" } = req.body;
+    const { message, userId, mode = "normal", role } = req.body;
 
     if (!message) return res.status(400).json({ reply: "Mensagem vazia" });
     if (!userId)  return res.status(400).json({ reply: "userId obrigatório" });
@@ -156,11 +162,15 @@ app.post("/api/chat", async (req, res) => {
       mode === "short" ? " Responde de forma curta e objectiva." :
       mode === "long"  ? " Responde de forma detalhada e completa." : "";
 
+    // ✅ Restrição a conteúdo académico — só para alunos. Professor e
+    // utilizador comum ("normal") continuam sem esta limitação.
+    const scopeInstruction = role === "aluno" ? "\n\n" + ALUNO_ACADEMIC_ONLY_INSTRUCTION : "";
+
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         // ✅ AVES identity sempre presente
-        { role: "system", content: AVES_SYSTEM_PROMPT + modeInstruction },
+        { role: "system", content: AVES_SYSTEM_PROMPT + modeInstruction + scopeInstruction },
         ...history,
         { role: "user", content: message },
       ],
