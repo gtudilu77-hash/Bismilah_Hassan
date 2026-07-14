@@ -302,6 +302,21 @@ export function VisionAI({ onBack }: { onBack: () => void }) {
     return () => window.speechSynthesis.cancel();
   }, []);
 
+  // ── Desbloqueio de áudio ─────────────────────────────────────────────────
+  // Browsers bloqueiam reprodução de áudio que não venha de uma interacção
+  // directa e recente do utilizador (política de autoplay). Sem isto, o
+  // audio.play() do speakNeural pode falhar EM SILÊNCIO — sem nenhum erro
+  // visível, o que faz parecer que "o A.V.E.S deixou de falar" sem
+  // explicação nenhuma. Chamamos isto no clique de qualquer botão
+  // principal (scan, mic, autónomo, registo) para reforçar sempre que há
+  // uma interacção recente.
+  const audioUnlockedRef = useRef(false);
+  const unlockAudio = useCallback(() => {
+    if (audioUnlockedRef.current) return;
+    const a = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
+    a.play().then(() => { audioUnlockedRef.current = true; }).catch(() => {});
+  }, []);
+
   // ── TTS (texto-para-voz) ───────────────────────────────────────────────────
   // Pede ao server.js (que por sua vez usa o modelo tts-1 da OpenAI) para
   // converter o texto da resposta em áudio, e reproduz-o. Se pedirem para
@@ -313,11 +328,22 @@ export function VisionAI({ onBack }: { onBack: () => void }) {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
       });
+      if (!res.ok) throw new Error('TTS respondeu ' + res.status);
       const blob  = await res.blob();
       const audio = new Audio(URL.createObjectURL(blob));
       audio.onended = () => setStatus('IDLE');
-      audio.play();
-    } catch { setStatus('IDLE'); }
+      // ⚠️ Antes, audio.play() não tinha .catch() nenhum — se o browser
+      // bloqueasse a reprodução (autoplay policy), a falha era invisível.
+      // Agora fica registada na consola, para se voltar a acontecer sabermos
+      // já qual é a causa exacta em vez de adivinhar.
+      audio.play().catch(err => {
+        console.error('[A.V.E.S] Falha ao reproduzir voz (possível bloqueio de autoplay do browser):', err);
+        setStatus('IDLE');
+      });
+    } catch (err) {
+      console.error('[A.V.E.S] Falha no TTS:', err);
+      setStatus('IDLE');
+    }
   }, []);
 
   // ── Capture frame helper ────────────────────────────────────────────────────
@@ -456,6 +482,7 @@ export function VisionAI({ onBack }: { onBack: () => void }) {
   // de dizer ao backend "não precisas de chamar o GPT-4o desta vez, usa o
   // que já sabes".
   const handleAction = useCallback(async (textOverride?: string) => {
+    unlockAudio();
     const queryText = textOverride ?? inputText;
     if (status === 'SCANNING') return; // evita pedidos sobrepostos
     setStatus('SCANNING');
@@ -494,7 +521,7 @@ export function VisionAI({ onBack }: { onBack: () => void }) {
       setChatLog(prev => [...prev, { role: 'ai', text: 'Falha: ' + (err?.message ?? 'erro') }]);
       setStatus('IDLE');
     }
-  }, [inputText, status, captureFrame, applyResults, shouldReidentify]);
+  }, [inputText, status, captureFrame, applyResults, shouldReidentify, unlockAudio]);
 
   // ── Autonomous mode ─────────────────────────────────────────────────────────
   // Liga/desliga o modo autónomo. Quando activo, tem 2 loops paralelos:
@@ -694,6 +721,7 @@ export function VisionAI({ onBack }: { onBack: () => void }) {
   }, [enrolling, captureFrame, resetIdentityCache]);
 
   const toggleListening = () => {
+    unlockAudio();
     if (status === 'LISTENING') { recognitionRef.current?.stop(); setStatus('IDLE'); }
     else { setStatus('LISTENING'); recognitionRef.current?.start(); }
   };
